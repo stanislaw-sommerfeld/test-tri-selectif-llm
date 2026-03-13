@@ -19,8 +19,8 @@ st.set_page_config(
 # LOGIN
 # ─────────────────────────────────────────────
 def check_credentials(username, password):
-    valid_user = hmac.compare_digest(username, st.secrets.get("APP_USERNAME", ""))
-    valid_pass = hmac.compare_digest(password, st.secrets.get("APP_PASSWORD", ""))
+    valid_user = hmac.compare_digest(username, st.secrets["Identifiers"]["APP_USERNAME"])
+    valid_pass = hmac.compare_digest(password, st.secrets["Identifiers"]["APP_PASSWORD"])
     return valid_user and valid_pass
 
 def login_screen():
@@ -132,7 +132,7 @@ with st.sidebar:
     st.markdown("---")
 
     # Clé API
-    api_key = st.secrets.get("GEMINI_API_KEY", "") if hasattr(st, "secrets") else ""
+    api_key = st.secrets["API_Key"]["GEMINI_API_KEY"] if hasattr(st, "secrets") else ""
     if not api_key:
         api_key = st.text_input("🔑 Clé API Google Gemini", type="password",
                                  help="Gratuit sur https://aistudio.google.com",
