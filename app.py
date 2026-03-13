@@ -96,6 +96,8 @@ if captured_image and api_key and bins_config:
         # Gemini 2.5 Flash is highly capable for vision tasks and operates on the free tier.
         model = genai.GenerativeModel('gemini-2.5-flash')
         
+        st.warning(f"The app is currently trying to use: {model.model_name}")
+        
         image = Image.open(captured_image)
         
         with st.spinner("Analyse en cours par Gemini..."):
