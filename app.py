@@ -112,7 +112,7 @@ def prepare_image(uploaded):
 
 def call_gemini(api_key, prompt, pil_img):
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.1-pro-preview")
     response = model.generate_content([prompt, pil_img])
     raw = response.text.strip()
     if "```" in raw:
