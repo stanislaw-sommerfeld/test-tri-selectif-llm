@@ -49,6 +49,6 @@ Dans la barre latérale :
 ## 📦 Stack technique
 
 - **Frontend** : Streamlit
-- **IA** : Claude claude-opus-4-5 Vision (Anthropic)
+- **IA** : Gemini-1.5-Flash (Free API key)
 - **Python** : 3.9+
 - **Librairies** : anthropic, Pillow
