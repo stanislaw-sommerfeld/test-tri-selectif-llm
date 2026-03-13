@@ -1,9 +1,11 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import json
 from PIL import Image
 import io
 import hmac
+import time
 
 # ─────────────────────────────────────────────
 # CONFIG PAGE
@@ -19,9 +21,12 @@ st.set_page_config(
 # LOGIN
 # ─────────────────────────────────────────────
 def check_credentials(username, password):
-    valid_user = hmac.compare_digest(username, st.secrets["Identifiers"]["APP_USERNAME"])
-    valid_pass = hmac.compare_digest(password, st.secrets["Identifiers"]["APP_PASSWORD"])
-    return valid_user and valid_pass
+    try:
+        valid_user = hmac.compare_digest(username, st.secrets["Identifiers"]["APP_USERNAME"])
+        valid_pass = hmac.compare_digest(password, st.secrets["Identifiers"]["APP_PASSWORD"])
+        return valid_user and valid_pass
+    except Exception:
+        return False
 
 def login_screen():
     st.markdown("""
@@ -77,6 +82,12 @@ st.markdown("""
 # ─────────────────────────────────────────────
 # CONSTANTES
 # ─────────────────────────────────────────────
+# Modèle gratuit fiable : gemini-2.0-flash-lite
+# - Gratuit sur le free tier Google AI Studio
+# - Supporte la vision (analyse d'images)
+# - Quota : 1 500 req/jour, 30 req/min
+GEMINI_MODEL = "gemini-2.0-flash-lite"
+
 DEFAULT_BINS = [
     {"name": "🟡 Poubelle Jaune",       "couleur": "#f5c518", "description": "Recyclables : plastiques, métaux, cartons, briques alimentaires"},
     {"name": "🟢 Poubelle Verte",       "couleur": "#00b34a", "description": "Verre uniquement : bouteilles, bocaux, pots"},
@@ -100,6 +111,7 @@ def get_color(name):
 # HELPERS
 # ─────────────────────────────────────────────
 def prepare_image(uploaded):
+    """Ouvre et normalise une image uploadée."""
     img = Image.open(uploaded)
     buf = io.BytesIO()
     fmt = img.format or "JPEG"
@@ -108,18 +120,50 @@ def prepare_image(uploaded):
     img_out = img.convert("RGB") if fmt == "JPEG" else img
     img_out.save(buf, format=fmt)
     buf.seek(0)
-    return img, Image.open(buf)
+    return img, buf.getvalue(), f"image/{fmt.lower()}"
 
-def call_gemini(api_key, prompt, pil_img):
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
-    response = model.generate_content([prompt, pil_img])
-    raw = response.text.strip()
-    if "```" in raw:
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return raw.strip()
+def call_gemini(api_key, prompt, image_bytes, mime_type, retries=3):
+    """
+    Appel à l'API Gemini avec la nouvelle lib google-genai.
+    Retry automatique si quota temporairement dépassé (429).
+    """
+    client = genai.Client(api_key=api_key)
+
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+    text_part  = types.Part.from_text(text=prompt)
+    contents   = [types.Content(role="user", parts=[image_part, text_part])]
+
+    for attempt in range(retries):
+        try:
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=contents,
+            )
+            raw = response.text.strip()
+            # Nettoyer les balises markdown si présentes
+            if "```" in raw:
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            return raw.strip()
+
+        except Exception as e:
+            err_str = str(e)
+            # Détection erreur 429 (quota rate limit temporaire)
+            if "429" in err_str and "retry" in err_str.lower() and attempt < retries - 1:
+                # Extraire le délai suggéré par Google si disponible
+                wait = 20
+                try:
+                    import re
+                    match = re.search(r"retry_delay\s*\{\s*seconds:\s*(\d+)", err_str)
+                    if match:
+                        wait = int(match.group(1)) + 2
+                except Exception:
+                    pass
+                st.warning(f"⏳ Quota momentanément atteint, nouvelle tentative dans {wait}s… (tentative {attempt+1}/{retries})")
+                time.sleep(wait)
+                continue
+            raise  # Toute autre erreur : on la remonte
 
 # ─────────────────────────────────────────────
 # SIDEBAR
@@ -131,14 +175,16 @@ with st.sidebar:
         st.rerun()
     st.markdown("---")
 
-    # Clé API
-    api_key = st.secrets["API_Key"]["GEMINI_API_KEY"] if hasattr(st, "secrets") else ""
-    if not api_key:
+    # Clé API — depuis les secrets Streamlit Cloud
+    try:
+        api_key = st.secrets["API_Key"]["GEMINI_API_KEY"]
+        st.success(f"🔑 Clé API chargée · modèle : `{GEMINI_MODEL}`")
+    except Exception:
         api_key = st.text_input("🔑 Clé API Google Gemini", type="password",
                                  help="Gratuit sur https://aistudio.google.com",
                                  placeholder="AIza...")
-    else:
-        st.success("🔑 Clé API chargée")
+        if api_key:
+            st.caption(f"Modèle : `{GEMINI_MODEL}`")
 
     st.markdown("---")
     lang = st.selectbox("🌐 Langue", ["Français", "English", "Español", "Deutsch"])
@@ -164,7 +210,7 @@ with st.sidebar:
         if st.button("🤖 Détecter mes poubelles", use_container_width=True, type="primary"):
             with st.spinner("Analyse des poubelles en cours..."):
                 try:
-                    _, pil_scan = prepare_image(scan_image)
+                    _, img_bytes, mime = prepare_image(scan_image)
                     prompt_scan = """Analyse cette photo de poubelles/conteneurs de tri.
 Identifie chaque poubelle visible (couleur, étiquette, type).
 Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
@@ -176,7 +222,7 @@ Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
   }
 ]
 Utilise un emoji de couleur correspondante dans le nom. Sois précis sur le contenu accepté."""
-                    raw = call_gemini(api_key, prompt_scan, pil_scan)
+                    raw = call_gemini(api_key, prompt_scan, img_bytes, mime)
                     detected = json.loads(raw)
                     st.session_state.bins = {
                         b["name"]: {
@@ -188,8 +234,14 @@ Utilise un emoji de couleur correspondante dans le nom. Sois précis sur le cont
                     }
                     st.success(f"✅ {len(detected)} poubelle(s) détectée(s) !")
                     st.rerun()
+                except json.JSONDecodeError:
+                    st.error("❌ L'IA n'a pas retourné un JSON valide, réessayez.")
                 except Exception as e:
-                    st.error(f"Erreur : {e}")
+                    err = str(e)
+                    if "429" in err:
+                        st.error("❌ Quota journalier Gemini atteint. Réessayez demain ou vérifiez votre plan sur https://ai.dev/rate-limit")
+                    else:
+                        st.error(f"❌ Erreur : {e}")
     elif scan_image and not api_key:
         st.warning("Clé API requise pour scanner")
 
@@ -239,16 +291,16 @@ Utilise un emoji de couleur correspondante dans le nom. Sois précis sur le cont
         }
         st.rerun()
 
-    st.markdown("""
+    st.markdown(f"""
     <div style='font-size:0.75rem;color:#666;text-align:center;margin-top:1rem'>
-    TriSmart v3.0 · Gemini 2.0 Flash · Gratuit
+    TriSmart v4.0 · {GEMINI_MODEL}<br>Google AI · Streamlit · 100% Gratuit
     </div>""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────
 st.markdown('<div class="hero-title">♻️ TriSmart</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero-sub">Détection intelligente des déchets · Gemini 2.0 Flash · Gratuit</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-sub">Détection intelligente des déchets · {GEMINI_MODEL} · Gratuit</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -300,14 +352,14 @@ with tab2:
 # ANALYSE DÉCHET
 # ─────────────────────────────────────────────
 if captured_image and api_key and bins_config:
-    img, pil_img = prepare_image(captured_image)
+    img, img_bytes, mime_type = prepare_image(captured_image)
 
     col_img, col_info = st.columns([1, 1])
     with col_img:
         st.image(img, caption=f"📷 {source_label}", use_container_width=True)
     with col_info:
         st.markdown("### 🔍 Prêt à analyser")
-        st.caption(f"{img.size[0]}×{img.size[1]}px · Gemini 2.0 Flash")
+        st.caption(f"{img.size[0]}×{img.size[1]}px · {GEMINI_MODEL}")
         analyze = st.button("🤖 Analyser avec l'IA", use_container_width=True, type="primary")
 
     if analyze:
@@ -333,14 +385,14 @@ Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
 
         with st.spinner("🤖 Analyse en cours..."):
             try:
-                raw = call_gemini(api_key, prompt, pil_img)
+                raw = call_gemini(api_key, prompt, img_bytes, mime_type)
                 result = json.loads(raw)
 
                 st.markdown("---")
                 st.markdown("## 🎯 Résultat")
 
-                bin_name = result.get("poubelle_recommandee", "Inconnue")
-                bin_color = get_color(bin_name)
+                bin_name   = result.get("poubelle_recommandee", "Inconnue")
+                bin_color  = get_color(bin_name)
                 confidence = result.get("confiance", 0)
 
                 st.markdown(f"""
@@ -398,8 +450,17 @@ Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
                 st.error(f"❌ Erreur JSON : {e}")
                 st.code(raw)
             except Exception as e:
-                st.error(f"❌ Erreur : {e}")
-                st.exception(e)
+                err = str(e)
+                if "429" in err:
+                    st.error(
+                        "❌ **Quota Gemini atteint.**\n\n"
+                        "- Si c'est un quota **par minute** : attendez 1 minute et réessayez\n"
+                        "- Si c'est un quota **journalier** : revenez demain\n"
+                        "- Vérifiez votre usage sur https://ai.dev/rate-limit"
+                    )
+                else:
+                    st.error(f"❌ Erreur : {e}")
+                    st.exception(e)
 
 elif captured_image and not api_key:
     st.warning("⚠️ Clé API manquante.")
@@ -423,7 +484,7 @@ with st.expander("📖 Guide de tri rapide (France)"):
 > 💡 Vider et rincer les emballages avant recyclage !
     """)
 
-st.markdown("""
+st.markdown(f"""
 <div style='text-align:center;color:#444;font-size:0.8rem;margin-top:2rem'>
-    TriSmart v3.0 · Gemini 2.0 Flash · Streamlit · 100% Gratuit
+    TriSmart v4.0 · {GEMINI_MODEL} · Streamlit · 100% Gratuit
 </div>""", unsafe_allow_html=True)
