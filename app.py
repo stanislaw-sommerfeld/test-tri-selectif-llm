@@ -82,11 +82,22 @@ st.markdown("""
 # ─────────────────────────────────────────────
 # CONSTANTES
 # ─────────────────────────────────────────────
-# Modèle gratuit fiable : gemini-2.0-flash-lite
-# - Gratuit sur le free tier Google AI Studio
-# - Supporte la vision (analyse d'images)
-# - Quota : 1 500 req/jour, 30 req/min
-GEMINI_MODEL = "gemini-2.0-flash-lite"
+# Modeles free tier actifs (mars 2026)
+# Quotas journaliers approximatifs :
+#   gemini-2.5-flash-lite     : ~1 000 req/jour  <- meilleur choix
+#   gemini-2.5-flash          : ~250 req/jour
+#   gemini-3-flash-preview    : ~200 req/jour (preview)
+#   gemini-3.1-flash-lite-preview : ~200 req/jour (preview)
+GEMINI_MODELS = {
+    "gemini-2.5-flash-lite":         "⚡ 2.5 Flash Lite           ~ 1000 req/jour  RECOMMANDE",
+    "gemini-2.5-flash":              "🚀 2.5 Flash               ~ 250 req/jour",
+    "gemini-3-flash-preview":        "🔥 3 Flash Preview         ~ 200 req/jour (preview)",
+    "gemini-3.1-flash-lite-preview": "🧪 3.1 Flash Lite Preview  ~ 200 req/jour (preview)",
+}
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
+
+def get_model():
+    return st.session_state.get("gemini_model", DEFAULT_MODEL)
 
 DEFAULT_BINS = [
     {"name": "🟡 Poubelle Jaune",       "couleur": "#f5c518", "description": "Recyclables : plastiques, métaux, cartons, briques alimentaires"},
@@ -136,7 +147,7 @@ def call_gemini(api_key, prompt, image_bytes, mime_type, retries=3):
     for attempt in range(retries):
         try:
             response = client.models.generate_content(
-                model=GEMINI_MODEL,
+                model=get_model(),
                 contents=contents,
             )
             raw = response.text.strip()
@@ -178,16 +189,27 @@ with st.sidebar:
     # Clé API — depuis les secrets Streamlit Cloud
     try:
         api_key = st.secrets["API_Key"]["GEMINI_API_KEY"]
-        st.success(f"🔑 Clé API chargée · modèle : `{GEMINI_MODEL}`")
+        st.success("🔑 Clé API chargée")
     except Exception:
         api_key = st.text_input("🔑 Clé API Google Gemini", type="password",
                                  help="Gratuit sur https://aistudio.google.com",
                                  placeholder="AIza...")
         if api_key:
-            st.caption(f"Modèle : `{GEMINI_MODEL}`")
+            st.caption(f"Modèle : `{get_model()}`")
 
     st.markdown("---")
     lang = st.selectbox("🌐 Langue", ["Français", "English", "Español", "Deutsch"])
+
+    # ── Sélecteur de modèle ──
+    st.markdown("---")
+    st.markdown("### 🤖 Modèle IA")
+    st.caption("Si quota atteint sur un modèle, bascule sur un autre")
+    model_keys = list(GEMINI_MODELS.keys())
+    model_labels = list(GEMINI_MODELS.values())
+    current_idx = model_keys.index(st.session_state.get("gemini_model", "gemini-2.0-flash-lite"))
+    chosen = st.radio("Modèle", model_labels, index=current_idx, label_visibility="collapsed")
+    st.session_state["gemini_model"] = model_keys[model_labels.index(chosen)]
+    st.caption(f"Sélectionné : `{st.session_state['gemini_model']}`")
 
     # ── Scanner ses poubelles par photo ──
     st.markdown("---")
@@ -293,14 +315,14 @@ Utilise un emoji de couleur correspondante dans le nom. Sois précis sur le cont
 
     st.markdown(f"""
     <div style='font-size:0.75rem;color:#666;text-align:center;margin-top:1rem'>
-    TriSmart v4.0 · {GEMINI_MODEL}<br>Google AI · Streamlit · 100% Gratuit
+    TriSmart v4.0 · {get_model()}<br>Google AI · Streamlit · 100% Gratuit
     </div>""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────
 st.markdown('<div class="hero-title">♻️ TriSmart</div>', unsafe_allow_html=True)
-st.markdown(f'<div class="hero-sub">Détection intelligente des déchets · {GEMINI_MODEL} · Gratuit</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-sub">Détection intelligente des déchets · {get_model()} · Gratuit</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -359,7 +381,7 @@ if captured_image and api_key and bins_config:
         st.image(img, caption=f"📷 {source_label}", use_container_width=True)
     with col_info:
         st.markdown("### 🔍 Prêt à analyser")
-        st.caption(f"{img.size[0]}×{img.size[1]}px · {GEMINI_MODEL}")
+        st.caption(f"{img.size[0]}×{img.size[1]}px · {get_model()}")
         analyze = st.button("🤖 Analyser avec l'IA", use_container_width=True, type="primary")
 
     if analyze:
@@ -486,5 +508,5 @@ with st.expander("📖 Guide de tri rapide (France)"):
 
 st.markdown(f"""
 <div style='text-align:center;color:#444;font-size:0.8rem;margin-top:2rem'>
-    TriSmart v4.0 · {GEMINI_MODEL} · Streamlit · 100% Gratuit
+    TriSmart v4.0 · {get_model()} · Streamlit · 100% Gratuit
 </div>""", unsafe_allow_html=True)
