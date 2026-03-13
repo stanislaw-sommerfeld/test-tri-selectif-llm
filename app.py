@@ -3,6 +3,7 @@ import google.generativeai as genai
 import json
 from PIL import Image
 import io
+import hmac
 
 # ─────────────────────────────────────────────
 # CONFIG PAGE
@@ -13,6 +14,43 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="expanded",
 )
+
+# ─────────────────────────────────────────────
+# LOGIN
+# ─────────────────────────────────────────────
+def check_credentials(username, password):
+    valid_user = hmac.compare_digest(username, st.secrets.get("APP_USERNAME", ""))
+    valid_pass = hmac.compare_digest(password, st.secrets.get("APP_PASSWORD", ""))
+    return valid_user and valid_pass
+
+def login_screen():
+    st.markdown("""
+    <div style="max-width:380px;margin:4rem auto 0 auto;text-align:center">
+        <div style="font-size:3rem">♻️</div>
+        <div style="font-size:1.8rem;font-weight:700;background:linear-gradient(135deg,#00d084,#00a8ff);
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.3rem">
+            TriSmart
+        </div>
+        <div style="color:#888;margin-bottom:2rem">Connectez-vous pour continuer</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("login_form"):
+            username = st.text_input("👤 Nom d'utilisateur", placeholder="username")
+            password = st.text_input("🔒 Mot de passe", type="password", placeholder="••••••••")
+            submitted = st.form_submit_button("Se connecter", use_container_width=True, type="primary")
+            if submitted:
+                if check_credentials(username, password):
+                    st.session_state["logged_in"] = True
+                    st.rerun()
+                else:
+                    st.error("❌ Identifiants incorrects")
+
+if not st.session_state.get("logged_in", False):
+    login_screen()
+    st.stop()
 
 st.markdown("""
 <style>
@@ -69,6 +107,10 @@ BIN_COLORS = {
 # ─────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ⚙️ Configuration")
+    if st.button("🚪 Se déconnecter", use_container_width=True):
+        st.session_state["logged_in"] = False
+        st.rerun()
+    st.markdown("---")
 
     # Clé API — d'abord depuis les secrets Streamlit, sinon champ manuel
     api_key = st.secrets.get("GEMINI_API_KEY", "") if hasattr(st, "secrets") else ""
