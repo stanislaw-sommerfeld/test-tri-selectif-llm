@@ -5,38 +5,6 @@ Application Streamlit de détection et tri des déchets par IA (Gemini 1.5 Flash
 
 ---
 
-## 🚀 Déploiement sur Streamlit Cloud (recommandé)
-
-### 1. Clé API Gemini (gratuite)
-- Va sur [aistudio.google.com](https://aistudio.google.com)
-- Clique **"Get API Key"** → copie la clé (`AIza...`)
-
-### 2. Mettre les fichiers sur GitHub
-Crée un dépôt GitHub (public ou privé) et dépose uniquement :
-- `app.py`
-- `requirements.txt`
-
-> ⚠️ Ne jamais mettre `secrets.toml` sur GitHub !
-
-### 3. Déployer sur Streamlit Cloud
-- Va sur [share.streamlit.io](https://share.streamlit.io)
-- Connecte ton compte GitHub
-- Clique **"New app"** → sélectionne ton dépôt → `app.py`
-- Clique **"Advanced settings"** et choisis **Python 3.11**
-- Dans la zone **Secrets**, colle ceci en remplaçant par tes vraies valeurs :
-
-```toml
-GEMINI_API_KEY = "AIza..."
-APP_USERNAME = "tonnom"
-APP_PASSWORD = "tonmotdepasse"
-```
-
-- Clique **Save** puis **Deploy**
-
-En 2 minutes tu obtiens une URL publique `https://[ton-app].streamlit.app` 🎉
-
----
-
 ## 🔐 Authentification
 
 L'app est protégée par un login username/password.  
