@@ -157,18 +157,6 @@ COUNTRY_GUIDES = {
         ("electronics",     "🔴 Punto Limpio"),
     ]},
 }
-    "🇪🇸 España": {
-        "rows": [
-            ("Envases plásticos, latas, bricks", "🟡 Amarillo"),
-            ("Papel y cartón",                   "🔵 Azul"),
-            ("Vidrio",                           "🟢 Verde (iglú)"),
-            ("Residuos orgánicos",               "🟤 Marrón"),
-            ("Resto",                            "⚫ Gris/Negro"),
-            ("Residuos peligrosos",              "🔴 Punto Limpio"),
-            ("Electrónica",                      "🔴 Punto Limpio / tienda"),
-        ],
-    },
-}
 
 # ══════════════════════════════════════════════
 # CONSTANTES MODÈLES
@@ -772,5 +760,5 @@ with st.expander(f"{t('guide_title')} — {country}"):
 
 st.markdown("""
 <div style='text-align:center;color:#444;font-size:.8rem;margin-top:2rem'>
-TriSmart v7.1 · Gemini + OpenRouter · Streamlit · Free
+TriSmart v7.2 · Gemini + OpenRouter · Streamlit · Free
 </div>""", unsafe_allow_html=True)
