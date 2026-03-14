@@ -605,72 +605,167 @@ if bins_config:
     st.markdown("")
 
 # ══════════════════════════════════════════════
-# CAPTURE — composant caméra custom avec bascule
+# CAPTURE — caméra custom responsive + bascule
 # ══════════════════════════════════════════════
 import streamlit.components.v1 as _components
 
-def camera_component(key="cam_custom"):
-    """
-    Composant HTML custom : flux vidéo live avec bouton bascule
-    caméra frontale ↔ arrière. Retourne une image base64 ou None.
-    """
-    html = """
-<div id="cam-wrapper" style="position:relative;width:100%;max-width:480px;margin:0 auto">
-  <video id="video" autoplay playsinline
-    style="width:100%;border-radius:12px;background:#111;display:block"></video>
+CAMERA_HTML = """
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; font-family: Inter, sans-serif; }
 
-  <!-- Boutons -->
-  <div style="display:flex;gap:8px;margin-top:8px">
-    <button id="btn-capture" onclick="capturePhoto()"
-      style="flex:1;padding:12px;background:linear-gradient(135deg,#00d084,#00a8ff);
-             color:white;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer">
-      📸 Capturer
-    </button>
-    <button id="btn-flip" onclick="flipCamera()"
-      style="padding:12px 16px;background:#1e3a2a;color:#00d084;
-             border:1px solid #00d084;border-radius:8px;font-size:1.2rem;cursor:pointer"
-      title="Changer de caméra">
-      🔄
-    </button>
+  #cam-wrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #video-box {
+    position: relative;
+    width: 100%;
+    background: #0d0d0d;
+    border-radius: 14px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+  }
+
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  #btn-flip {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid #00d084;
+    color: #00d084;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 1.3rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    z-index: 10;
+  }
+
+  #btn-capture {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #00d084, #00a8ff);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: .02em;
+  }
+
+  #preview-wrap {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #preview {
+    width: 100%;
+    border-radius: 14px;
+    border: 2px solid #00d084;
+    object-fit: cover;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-confirm {
+    flex: 1;
+    padding: 12px;
+    background: #00d084;
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: .95rem;
+    cursor: pointer;
+  }
+
+  .btn-retake {
+    flex: 1;
+    padding: 12px;
+    background: #1e1e1e;
+    color: #fff;
+    border: 1px solid #444;
+    border-radius: 10px;
+    font-size: .95rem;
+    cursor: pointer;
+  }
+
+  #status {
+    color: #888;
+    font-size: .78rem;
+    text-align: center;
+    min-height: 18px;
+  }
+</style>
+
+<div id="cam-wrapper">
+
+  <!-- Flux vidéo -->
+  <div id="video-box">
+    <video id="video" autoplay playsinline muted></video>
+    <button id="btn-flip" onclick="flipCamera()" title="Changer de caméra">🔄</button>
   </div>
 
-  <!-- Aperçu de la photo prise -->
+  <!-- Bouton capture -->
+  <button id="btn-capture" onclick="capturePhoto()">📸 Capturer</button>
+
+  <!-- Aperçu -->
   <canvas id="canvas" style="display:none"></canvas>
-  <div id="preview-wrap" style="display:none;margin-top:8px">
-    <img id="preview" style="width:100%;border-radius:12px;border:2px solid #00d084"/>
-    <div style="display:flex;gap:8px;margin-top:6px">
-      <button onclick="confirmPhoto()"
-        style="flex:1;padding:10px;background:#00d084;color:#000;border:none;
-               border-radius:8px;font-weight:700;cursor:pointer">✅ Utiliser cette photo</button>
-      <button onclick="retakePhoto()"
-        style="flex:1;padding:10px;background:#333;color:#fff;border:none;
-               border-radius:8px;cursor:pointer">🔁 Reprendre</button>
+  <div id="preview-wrap">
+    <img id="preview" />
+    <div class="btn-row">
+      <button class="btn-confirm" onclick="confirmPhoto()">✅ Utiliser</button>
+      <button class="btn-retake" onclick="retakePhoto()">🔁 Reprendre</button>
     </div>
   </div>
-  <div id="status" style="color:#888;font-size:.8rem;margin-top:4px;text-align:center"></div>
+
+  <div id="status"></div>
 </div>
 
 <script>
 let stream = null;
-let facingMode = "environment"; // start with rear camera
-let capturedDataUrl = null;
+let facingMode = "environment";
 
 async function startCamera() {
-  if (stream) { stream.getTracks().forEach(t => t.stop()); }
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  const constraints = {
+    video: {
+      facingMode: { ideal: facingMode },
+      width:  { ideal: 1920 },
+      height: { ideal: 1440 }
+    }
+  };
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 960 } }
-    });
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
     document.getElementById("video").srcObject = stream;
     document.getElementById("status").textContent = "";
   } catch(e) {
-    // fallback: try without facingMode constraint
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: true });
       document.getElementById("video").srcObject = stream;
-      document.getElementById("status").textContent = "⚠️ Bascule caméra non supportée sur cet appareil";
+      document.getElementById("status").textContent = "⚠️ Bascule non disponible sur cet appareil";
     } catch(e2) {
-      document.getElementById("status").textContent = "❌ Caméra inaccessible : " + e2.message;
+      document.getElementById("status").textContent = "❌ Caméra inaccessible";
     }
   }
 }
@@ -683,51 +778,54 @@ function flipCamera() {
 function capturePhoto() {
   const video  = document.getElementById("video");
   const canvas = document.getElementById("canvas");
-  canvas.width  = video.videoWidth  || 640;
-  canvas.height = video.videoHeight || 480;
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 960;
   canvas.getContext("2d").drawImage(video, 0, 0);
-  capturedDataUrl = canvas.toDataURL("image/jpeg", 0.92);
-  document.getElementById("preview").src = capturedDataUrl;
-  document.getElementById("preview-wrap").style.display = "block";
-  document.getElementById("video").style.opacity = "0.3";
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+  document.getElementById("preview").src = dataUrl;
+  document.getElementById("preview-wrap").style.display = "flex";
+  document.getElementById("video-box").style.display = "none";
+  document.getElementById("btn-capture").style.display = "none";
+  window._capturedDataUrl = dataUrl;
 }
 
 function retakePhoto() {
-  capturedDataUrl = null;
   document.getElementById("preview-wrap").style.display = "none";
-  document.getElementById("video").style.opacity = "1";
+  document.getElementById("video-box").style.display = "block";
+  document.getElementById("btn-capture").style.display = "block";
+  window._capturedDataUrl = null;
 }
 
 function confirmPhoto() {
-  // Send base64 image to Streamlit via postMessage
-  window.parent.postMessage({ type: "trismart_photo", data: capturedDataUrl }, "*");
-  document.getElementById("status").textContent = "✅ Photo envoyée !";
-  document.getElementById("preview-wrap").style.display = "none";
-  document.getElementById("video").style.opacity = "1";
+  window.parent.postMessage(
+    { type: "trismart_photo", data: window._capturedDataUrl }, "*"
+  );
+  document.getElementById("status").textContent = "✅ Photo transmise à l'analyse !";
+  retakePhoto();
 }
 
-// Start camera on load
 startCamera();
 </script>
 """
-    result = _components.html(html, height=500, scrolling=False)
-    return result
 
-# ── Réception du message JS → Streamlit via query param trick ──
-# On utilise st.camera_input comme fallback fiable +
-# le composant custom pour la bascule caméra
+def show_camera():
+    _components.html(CAMERA_HTML, height=520, scrolling=False)
 
+# ── Tabs capture ──
 tab1, tab2 = st.tabs([t("tab_camera"), t("tab_upload")])
 captured_image = None
 source_label   = ""
 
 with tab1:
-    st.caption("💡 Utilisez le bouton 🔄 pour basculer entre caméra frontale et arrière")
-    # Composant custom (bascule caméra)
-    camera_component(key="cam_custom_main")
-    st.markdown("<div style='text-align:center;color:#666;font-size:.8rem;margin:4px 0'>— ou utilisez la caméra standard —</div>", unsafe_allow_html=True)
-    cam = st.camera_input("", label_visibility="collapsed", key="cam_dechet")
-    if cam: captured_image = cam; source_label = t("tab_camera")
+    # Composant custom uniquement — pas de st.camera_input en doublon
+    show_camera()
+    st.caption("🔄 Bouton en haut à droite du flux vidéo pour basculer caméra")
+    # Fallback : l'utilisateur peut aussi uploader depuis l'onglet 2
+    # Pour récupérer l'image capturée, on passe par st.camera_input caché
+    # uniquement si le composant custom échoue (ex: navigateur sans getUserMedia)
+    with st.expander("🔧 Fallback — caméra navigateur standard", expanded=False):
+        cam = st.camera_input("", label_visibility="collapsed", key="cam_dechet")
+        if cam: captured_image = cam; source_label = t("tab_camera")
 
 with tab2:
     upl = st.file_uploader("", type=["jpg","jpeg","png","webp"],
@@ -874,5 +972,5 @@ with st.expander(f"{t('guide_title')} — {country}"):
 
 st.markdown("""
 <div style='text-align:center;color:#444;font-size:.8rem;margin-top:2rem'>
-TriSmart v7.3 · Gemini + OpenRouter · Streamlit · Free
+TriSmart v7.4 · Gemini + OpenRouter · Streamlit · Free
 </div>""", unsafe_allow_html=True)
