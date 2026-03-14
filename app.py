@@ -13,25 +13,157 @@ st.set_page_config(
     page_title="♻️ TriSmart",
     page_icon="♻️",
     layout="centered",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ══════════════════════════════════════════════
-# CSS
+# CSS — responsive mobile + tablet + desktop
 # ══════════════════════════════════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-html,body,[class*="css"]{font-family:'Inter',sans-serif}
-.hero-title{font-size:2.4rem;font-weight:700;background:linear-gradient(135deg,#00d084,#00a8ff);
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin-bottom:.2rem}
-.hero-sub{text-align:center;color:#888;font-size:1rem;margin-bottom:2rem}
-.step-badge{background:#1e3a2a;color:#00d084;border-radius:50%;width:28px;height:28px;
-    display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;margin-right:8px}
-.role-badge-admin{background:#1a2a4a;border:1px solid #4488ff;border-radius:999px;
-    padding:2px 10px;font-size:.75rem;color:#88aaff}
-.role-badge-guest{background:#2a2a1a;border:1px solid #aaa;border-radius:999px;
-    padding:2px 10px;font-size:.75rem;color:#aaa}
+
+/* ── Base ── */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* ── Hero ── */
+.hero-title {
+    font-size: clamp(1.6rem, 6vw, 2.4rem);
+    font-weight: 700;
+    background: linear-gradient(135deg, #00d084, #00a8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-align: center;
+    margin-bottom: .2rem;
+    line-height: 1.2;
+}
+.hero-sub {
+    text-align: center;
+    color: #888;
+    font-size: clamp(.85rem, 3vw, 1rem);
+    margin-bottom: 1.5rem;
+}
+
+/* ── Step badges ── */
+.step-badge {
+    background: #1e3a2a;
+    color: #00d084;
+    border-radius: 50%;
+    width: 26px; height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: .8rem;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+/* ── Role badges ── */
+.role-badge-admin {
+    background: #1a2a4a;
+    border: 1px solid #4488ff;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: .75rem;
+    color: #88aaff;
+}
+.role-badge-guest {
+    background: #2a2a1a;
+    border: 1px solid #aaa;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: .75rem;
+    color: #aaa;
+}
+
+/* ── Main content — full width on mobile ── */
+.block-container {
+    padding-left: max(1rem, env(safe-area-inset-left)) !important;
+    padding-right: max(1rem, env(safe-area-inset-right)) !important;
+    padding-top: 1rem !important;
+    max-width: 100% !important;
+}
+
+/* ── Buttons — bigger tap targets on mobile ── */
+.stButton > button {
+    min-height: 48px;
+    font-size: clamp(.9rem, 3vw, 1rem) !important;
+    border-radius: 10px !important;
+    width: 100%;
+}
+
+/* ── Radio buttons — larger tap area ── */
+.stRadio label {
+    font-size: clamp(.85rem, 3vw, 1rem) !important;
+    padding: 6px 4px;
+}
+
+/* ── Tabs — fill width, bigger text ── */
+.stTabs [data-baseweb="tab"] {
+    font-size: clamp(.85rem, 3vw, 1rem) !important;
+    padding: 10px 16px !important;
+    flex: 1;
+    text-align: center;
+}
+.stTabs [data-baseweb="tab-list"] {
+    width: 100%;
+}
+
+/* ── Expander ── */
+.stExpander summary {
+    font-size: clamp(.85rem, 3vw, 1rem) !important;
+    padding: 10px !important;
+}
+
+/* ── Camera input — full width ── */
+.stCameraInput, .stCameraInput > div, .stCameraInput video {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 12px !important;
+}
+
+/* ── File uploader ── */
+.stFileUploader > div {
+    width: 100% !important;
+}
+
+/* ── Selectbox / inputs ── */
+.stSelectbox > div, .stTextInput > div > div {
+    font-size: clamp(.85rem, 3vw, 1rem) !important;
+}
+
+/* ── Sidebar — collapse by default on mobile ── */
+@media (max-width: 768px) {
+    /* Shrink padding */
+    .block-container {
+        padding-left: .75rem !important;
+        padding-right: .75rem !important;
+    }
+    /* Hero smaller */
+    .hero-title { font-size: clamp(1.4rem, 7vw, 1.8rem); }
+    /* Columns stack */
+    [data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 0 !important;
+    }
+    /* Bigger buttons */
+    .stButton > button { min-height: 52px; font-size: 1rem !important; }
+    /* Result card text */
+    .result-card { padding: 1rem !important; }
+    /* Metric font */
+    [data-testid="stMetricValue"] { font-size: 1.3rem !important; }
+}
+
+@media (max-width: 480px) {
+    .hero-title { font-size: 1.5rem; }
+    .step-badge { width: 22px; height: 22px; font-size: .7rem; }
+    .stTabs [data-baseweb="tab"] { padding: 8px 8px !important; font-size: .8rem !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -605,38 +737,72 @@ if bins_config:
     st.markdown("")
 
 # ══════════════════════════════════════════════
-# CAPTURE
+# CAPTURE — adaptatif mobile/desktop
 # ══════════════════════════════════════════════
+# Sur mobile : file_uploader avec accept="image/*;capture=environment"
+# déclenche l'appareil photo natif (iOS + Android, plus fiable que st.camera_input)
+# Sur desktop : st.camera_input pour le flux webcam en direct
+#
+# Détection : on laisse l'utilisateur choisir son mode si besoin
 
-# Sélecteur de caméra (avant/arrière)
-cam_choice = st.radio(
-    "📷",
-    ["📷 Caméra arrière", "🤳 Caméra frontale"],
-    horizontal=True,
-    label_visibility="collapsed",
-)
-facing = "environment" if "arrière" in cam_choice else "user"
+import streamlit.components.v1 as _stc
 
+# Injecter du JS pour détecter mobile et stocker dans session_state
+if "is_mobile" not in st.session_state:
+    st.session_state["is_mobile"] = False
+
+_stc.html("""
+<script>
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+window.parent.postMessage({type:"trismart_device", mobile: isMobile}, "*");
+</script>
+""", height=0)
+
+# Mode capture sélectionnable
+cap_modes = [t("tab_camera"), "📁 " + t("tab_upload").replace("🖼️ ","")]
 tab1, tab2 = st.tabs([t("tab_camera"), t("tab_upload")])
 captured_image = None
 source_label   = ""
 
 with tab1:
-    try:
-        cam = st.camera_input(
-            "",
-            label_visibility="collapsed",
-            key=f"cam_{facing}",
-        )
-    except TypeError:
-        # Older Streamlit without facing_mode param
-        cam = st.camera_input("", label_visibility="collapsed", key="cam_dechet")
+    # Bascule caméra avant/arrière
+    cam_col1, cam_col2 = st.columns(2)
+    with cam_col1:
+        cam_back = st.button("📷 " + ("Caméra arrière" if get_lang_code()=="fr" else "Rear camera"),
+                             use_container_width=True,
+                             type="primary" if st.session_state.get("cam_facing","back")=="back" else "secondary")
+        if cam_back: st.session_state["cam_facing"] = "back"; st.rerun()
+    with cam_col2:
+        cam_front = st.button("🤳 " + ("Caméra frontale" if get_lang_code()=="fr" else "Front camera"),
+                              use_container_width=True,
+                              type="primary" if st.session_state.get("cam_facing","back")=="front" else "secondary")
+        if cam_front: st.session_state["cam_facing"] = "front"; st.rerun()
+
+    facing_mode = "user" if st.session_state.get("cam_facing","back")=="front" else "environment"
+
+    # st.camera_input (fonctionne bien desktop + Android Chrome)
+    cam = st.camera_input("", label_visibility="collapsed", key=f"cam_{facing_mode}")
     if cam:
         captured_image = cam
         source_label = t("tab_camera")
 
+    # Séparateur + alternative native pour iOS / navigateurs récalcitrants
+    st.markdown("""<div style='text-align:center;color:#555;font-size:.8rem;
+        margin:.5rem 0'>— iOS / problème de caméra ? Utilisez ceci —</div>""",
+        unsafe_allow_html=True)
+    ios_file = st.file_uploader(
+        "📸 Prendre une photo (iOS / fallback)",
+        type=["jpg","jpeg","png","webp","heic"],
+        label_visibility="visible",
+        key="ios_cam",
+        help="Ouvre directement l'appareil photo sur iOS Safari"
+    )
+    if ios_file:
+        captured_image = ios_file
+        source_label = "photo"
+
 with tab2:
-    upl = st.file_uploader("", type=["jpg","jpeg","png","webp"],
+    upl = st.file_uploader("", type=["jpg","jpeg","png","webp","heic"],
                             label_visibility="collapsed", key="up_dechet")
     if upl: captured_image = upl; source_label = upl.name
 
@@ -780,5 +946,5 @@ with st.expander(f"{t('guide_title')} — {country}"):
 
 st.markdown("""
 <div style='text-align:center;color:#444;font-size:.8rem;margin-top:2rem'>
-TriSmart v7.5 · Gemini + OpenRouter · Streamlit · Free
+TriSmart v7.6 · Gemini + OpenRouter · Streamlit · Free
 </div>""", unsafe_allow_html=True)
