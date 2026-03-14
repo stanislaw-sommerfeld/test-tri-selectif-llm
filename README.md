@@ -69,8 +69,8 @@ APP_USERNAME = "your_username"
 APP_PASSWORD = "your_password"
 
 [API_Key]
-GEMINI_API_KEY = "AIza..."
-OPEN_ROUTER_API_KEY = "sk-or-..."
+GEMINI_API_KEY = "..."
+OPEN_ROUTER_API_KEY = "..."
 ```
 
 - Click **Save** then **Deploy**
