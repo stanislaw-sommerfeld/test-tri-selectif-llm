@@ -332,10 +332,17 @@ Réponds UNIQUEMENT en JSON valide sans backticks :
 Emoji de couleur dans le nom. Précis sur le contenu."""
                     raw = call_ai(gemini_key, openrouter_key, prompt_scan, ib, mime, b64)
                     detected = json.loads(raw)
-                    st.session_state.bins = {
+                    # FUSION : on ajoute les nouvelles poubelles sans écraser les précédentes
+                    new_bins = {
                         b["name"]:{"description":b["description"],"couleur":b.get("couleur","#888"),"active":True}
                         for b in detected}
-                    st.success(f"✅ {len(detected)} poubelle(s) détectée(s) !")
+                    added   = [n for n in new_bins if n not in st.session_state.bins]
+                    updated = [n for n in new_bins if n in st.session_state.bins]
+                    st.session_state.bins.update(new_bins)
+                    msg = f"✅ {len(detected)} poubelle(s) détectée(s)"
+                    if added:   msg += f" · {len(added)} ajoutée(s)"
+                    if updated: msg += f" · {len(updated)} mise(s) à jour"
+                    st.success(msg)
                     st.rerun()
                 except json.JSONDecodeError:
                     st.error("❌ JSON invalide, réessayez.")
