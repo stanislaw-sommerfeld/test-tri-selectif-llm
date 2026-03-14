@@ -1,0 +1,191 @@
+{
+  "plastic_cans": {
+    "fr": "Bouteilles plastique, canettes",
+    "en": "Plastic bottles, cans",
+    "de": "Plastikflaschen, Dosen",
+    "es": "Botellas plástico, latas",
+    "ko": "플라스틱 병, 캔",
+    "zh": "塑料瓶、罐头",
+    "ja": "ペットボトル、缶"
+  },
+  "cardboard_paper": {
+    "fr": "Cartons, journaux, magazines",
+    "en": "Cardboard, newspapers, magazines",
+    "de": "Karton, Zeitungen, Magazine",
+    "es": "Cartón, periódicos, revistas",
+    "ko": "판지, 신문, 잡지",
+    "zh": "纸板、报纸、杂志",
+    "ja": "段ボール、新聞、雑誌"
+  },
+  "glass": {
+    "fr": "Bouteilles verre, bocaux",
+    "en": "Glass bottles, jars",
+    "de": "Glasflaschen, Gläser",
+    "es": "Botellas vidrio, tarros",
+    "ko": "유리병, 항아리",
+    "zh": "玻璃瓶、罐子",
+    "ja": "ガラス瓶、瓶詰め"
+  },
+  "food_waste": {
+    "fr": "Épluchures, restes alimentaires",
+    "en": "Food scraps, leftovers",
+    "de": "Essensreste, Küchenabfälle",
+    "es": "Restos alimentarios",
+    "ko": "음식물 쓰레기",
+    "zh": "厨余垃圾",
+    "ja": "生ごみ、食べ残し"
+  },
+  "general_waste": {
+    "fr": "Sacs sales, mouchoirs, couches",
+    "en": "Dirty bags, tissues, diapers",
+    "de": "Schmutzige Säcke, Taschentücher",
+    "es": "Bolsas sucias, pañuelos, pañales",
+    "ko": "더러운 봉투, 화장지, 기저귀",
+    "zh": "脏袋子、纸巾、尿布",
+    "ja": "汚れた袋、ティッシュ、おむつ"
+  },
+  "hazardous": {
+    "fr": "Piles, médicaments, huiles",
+    "en": "Batteries, medicines, oils",
+    "de": "Batterien, Medikamente, Öle",
+    "es": "Pilas, medicamentos, aceites",
+    "ko": "배터리, 약품, 기름",
+    "zh": "电池、药品、油类",
+    "ja": "電池、薬、油"
+  },
+  "electronics": {
+    "fr": "Appareils électroniques",
+    "en": "Electronic devices",
+    "de": "Elektronische Geräte",
+    "es": "Aparatos electrónicos",
+    "ko": "전자제품",
+    "zh": "电子产品",
+    "ja": "電子機器"
+  },
+  "garden_waste": {
+    "fr": "Déchets verts, taille",
+    "en": "Garden / yard waste",
+    "de": "Grünabfälle, Grasschnitt",
+    "es": "Residuos de jardín",
+    "ko": "정원 쓰레기",
+    "zh": "园艺垃圾",
+    "ja": "庭のごみ"
+  },
+  "textiles": {
+    "fr": "Textiles, vêtements",
+    "en": "Textiles, clothing",
+    "de": "Textilien, Kleidung",
+    "es": "Textiles, ropa",
+    "ko": "섬유, 의류",
+    "zh": "纺织品、衣物",
+    "ja": "衣類、繊維"
+  },
+  "pmc_be": {
+    "fr": "PMC : plastiques, métaux, briques",
+    "en": "PMC: plastics, metals, cartons",
+    "de": "PMC: Plastik, Metall, Kartons",
+    "es": "PMC: plásticos, metales, cartones",
+    "ko": "PMC: 플라스틱, 금속, 팩",
+    "zh": "PMC：塑料、金属、纸盒",
+    "ja": "PMC：プラスチック、金属、紙パック"
+  },
+  "combustible_jp": {
+    "fr": "Déchets combustibles (alimentaires, papier)",
+    "en": "Combustible waste (food, paper)",
+    "de": "Brennbarer Müll (Essen, Papier)",
+    "es": "Residuos combustibles (comida, papel)",
+    "ko": "가연성 쓰레기 (음식물, 종이)",
+    "zh": "可燃垃圾（食物、纸张）",
+    "ja": "可燃ごみ（生ごみ、紙など）"
+  },
+  "noncombustible_jp": {
+    "fr": "Déchets non combustibles (verre, métal)",
+    "en": "Non-combustible waste (glass, metal)",
+    "de": "Nicht brennbarer Müll (Glas, Metall)",
+    "es": "Residuos no combustibles (vidrio, metal)",
+    "ko": "불연성 쓰레기 (유리, 금속)",
+    "zh": "不可燃垃圾（玻璃、金属）",
+    "ja": "不燃ごみ（ガラス、金属）"
+  },
+  "plastic_wrap_jp": {
+    "fr": "Emballages plastique",
+    "en": "Plastic packaging/containers",
+    "de": "Plastikverpackungen",
+    "es": "Envases de plástico",
+    "ko": "플라스틱 용기·포장",
+    "zh": "塑料容器包装",
+    "ja": "プラスチック容器・包装"
+  },
+  "pet_jp": {
+    "fr": "Bouteilles PET",
+    "en": "PET bottles",
+    "de": "PET-Flaschen",
+    "es": "Botellas PET",
+    "ko": "페트병",
+    "zh": "PET瓶",
+    "ja": "ペットボトル"
+  },
+  "bulky_jp": {
+    "fr": "Encombrants",
+    "en": "Bulky waste",
+    "de": "Sperrmüll",
+    "es": "Residuos voluminosos",
+    "ko": "대형 폐기물",
+    "zh": "大件垃圾",
+    "ja": "粗大ごみ"
+  },
+  "recyclables_kr": {
+    "fr": "Plastiques, canettes, verre (recyclables)",
+    "en": "Plastics, cans, glass (recyclables)",
+    "de": "Plastik, Dosen, Glas (Wertstoffe)",
+    "es": "Plásticos, latas, vidrio (reciclables)",
+    "ko": "플라스틱, 캔, 유리 (재활용)",
+    "zh": "塑料、罐头、玻璃（可回收）",
+    "ja": "プラスチック、缶、ガラス（リサイクル）"
+  },
+  "general_kr": {
+    "fr": "Ordures ménagères",
+    "en": "General household waste",
+    "de": "Hausmüll",
+    "es": "Basura doméstica general",
+    "ko": "일반 쓰레기",
+    "zh": "一般生活垃圾",
+    "ja": "一般ごみ"
+  },
+  "fluorescent_kr": {
+    "fr": "Tubes fluorescents, piles",
+    "en": "Fluorescent tubes, batteries",
+    "de": "Leuchtstoffröhren, Batterien",
+    "es": "Tubos fluorescentes, pilas",
+    "ko": "형광등, 전지",
+    "zh": "荧光灯、电池",
+    "ja": "蛍光灯、乾電池"
+  },
+  "recyclable_cn": {
+    "fr": "Recyclables (papier, plastique, métal)",
+    "en": "Recyclables (paper, plastic, metal)",
+    "de": "Wertstoffe (Papier, Plastik, Metall)",
+    "es": "Reciclables (papel, plástico, metal)",
+    "ko": "재활용품 (종이, 플라스틱, 금속)",
+    "zh": "可回收物（纸、塑料、金属）",
+    "ja": "リサイクル可能（紙、プラスチック、金属）"
+  },
+  "hazardous_cn": {
+    "fr": "Déchets dangereux (piles, médicaments)",
+    "en": "Hazardous waste (batteries, medicines)",
+    "de": "Sondermüll (Batterien, Medikamente)",
+    "es": "Residuos peligrosos (pilas, medicamentos)",
+    "ko": "유해 폐기물 (배터리, 약품)",
+    "zh": "有害垃圾（电池、药品）",
+    "ja": "有害ごみ（電池、薬品）"
+  },
+  "other_cn": {
+    "fr": "Autres déchets",
+    "en": "Other waste",
+    "de": "Restmüll",
+    "es": "Otros residuos",
+    "ko": "기타 쓰레기",
+    "zh": "其他垃圾",
+    "ja": "その他のごみ"
+  }
+}
