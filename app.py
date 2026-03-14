@@ -545,9 +545,15 @@ Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
 
                 c1, c2 = st.columns(2)
                 with c1:
-                    st.success("♻️ Recyclable") if result.get("recyclable") else st.error("🚫 Non recyclable")
+                    if result.get("recyclable"):
+                        st.success("♻️ Recyclable")
+                    else:
+                        st.error("🚫 Non recyclable")
                 with c2:
-                    st.warning("⚠️ Dangereux") if result.get("dangereux") else st.info("✅ Non dangereux")
+                    if result.get("dangereux"):
+                        st.warning("⚠️ Dangereux")
+                    else:
+                        st.info("✅ Non dangereux")
 
                 with st.expander("🔧 JSON brut"):
                     st.json(result)
