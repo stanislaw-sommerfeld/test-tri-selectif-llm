@@ -1,11 +1,14 @@
 import streamlit as st
 from google import genai
 from google.genai import types
+from openai import OpenAI
+import base64
 import json
 from PIL import Image
 import io
 import hmac
 import time
+import re
 
 # ─────────────────────────────────────────────
 # CONFIG PAGE
@@ -80,24 +83,27 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# CONSTANTES
+# CONSTANTES — MODÈLES
 # ─────────────────────────────────────────────
-# Modeles free tier actifs (mars 2026)
-# Quotas journaliers approximatifs :
-#   gemini-2.5-flash-lite     : ~1 000 req/jour  <- meilleur choix
-#   gemini-2.5-flash          : ~250 req/jour
-#   gemini-3-flash-preview    : ~200 req/jour (preview)
-#   gemini-3.1-flash-lite-preview : ~200 req/jour (preview)
-GEMINI_MODELS = {
-    "gemini-2.5-flash-lite":         "⚡ 2.5 Flash Lite           ~ 1000 req/jour  RECOMMANDE",
-    "gemini-2.5-flash":              "🚀 2.5 Flash               ~ 250 req/jour",
-    "gemini-3-flash-preview":        "🔥 3 Flash Preview         ~ 200 req/jour (preview)",
-    "gemini-3.1-flash-lite-preview": "🧪 3.1 Flash Lite Preview  ~ 200 req/jour (preview)",
-}
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
-def get_model():
-    return st.session_state.get("gemini_model", DEFAULT_MODEL)
+# Gemini free tier (via google-genai)
+GEMINI_MODELS = {
+    "gemini-2.5-flash-lite":          "⚡ 2.5 Flash Lite  (~1 000 req/jour)  ✅ recommandé",
+    "gemini-2.5-flash":               "🚀 2.5 Flash       (~250 req/jour)",
+    "gemini-3-flash-preview":         "🔥 3 Flash Preview (~200 req/jour, preview)",
+    "gemini-3.1-flash-lite-preview":  "🧪 3.1 Flash Lite  (~200 req/jour, preview)",
+}
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+# OpenRouter free vision models (via openai-compatible API)
+OPENROUTER_MODELS = {
+    "openrouter/free":                          "🎲 Auto-free router  (choisit le meilleur dispo)",
+    "qwen/qwen2.5-vl-72b-instruct:free":        "🧠 Qwen 2.5 VL 72B  (très bon en vision)",
+    "meta-llama/llama-3.2-11b-vision-instruct:free": "🦙 Llama 3.2 11B Vision",
+    "google/gemma-3-27b-it:free":               "💎 Gemma 3 27B",
+    "mistralai/mistral-small-3.1-24b-instruct:free": "🌬️ Mistral Small 3.1 24B",
+}
+DEFAULT_OPENROUTER_MODEL = "openrouter/free"
 
 DEFAULT_BINS = [
     {"name": "🟡 Poubelle Jaune",       "couleur": "#f5c518", "description": "Recyclables : plastiques, métaux, cartons, briques alimentaires"},
@@ -107,7 +113,7 @@ DEFAULT_BINS = [
 ]
 
 # ─────────────────────────────────────────────
-# SESSION STATE — poubelles persistantes
+# SESSION STATE
 # ─────────────────────────────────────────────
 if "bins" not in st.session_state:
     st.session_state.bins = {
@@ -118,11 +124,21 @@ if "bins" not in st.session_state:
 def get_color(name):
     return st.session_state.bins.get(name, {}).get("couleur", "#888888")
 
+def get_provider():
+    return st.session_state.get("provider", "Gemini")
+
+def get_gemini_model():
+    m = st.session_state.get("gemini_model", DEFAULT_GEMINI_MODEL)
+    return m if m in GEMINI_MODELS else DEFAULT_GEMINI_MODEL
+
+def get_openrouter_model():
+    m = st.session_state.get("openrouter_model", DEFAULT_OPENROUTER_MODEL)
+    return m if m in OPENROUTER_MODELS else DEFAULT_OPENROUTER_MODEL
+
 # ─────────────────────────────────────────────
-# HELPERS
+# HELPERS — IMAGE
 # ─────────────────────────────────────────────
 def prepare_image(uploaded):
-    """Ouvre et normalise une image uploadée."""
     img = Image.open(uploaded)
     buf = io.BytesIO()
     fmt = img.format or "JPEG"
@@ -130,16 +146,25 @@ def prepare_image(uploaded):
         fmt = "JPEG"
     img_out = img.convert("RGB") if fmt == "JPEG" else img
     img_out.save(buf, format=fmt)
-    buf.seek(0)
-    return img, buf.getvalue(), f"image/{fmt.lower()}"
+    raw_bytes = buf.getvalue()
+    mime = f"image/{fmt.lower()}"
+    b64 = base64.b64encode(raw_bytes).decode("utf-8")
+    return img, raw_bytes, mime, b64
+
+# ─────────────────────────────────────────────
+# HELPERS — APPELS IA
+# ─────────────────────────────────────────────
+def clean_raw(raw):
+    """Nettoie les balises markdown du JSON retourné."""
+    if "```" in raw:
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    return raw.strip()
 
 def call_gemini(api_key, prompt, image_bytes, mime_type, retries=3):
-    """
-    Appel à l'API Gemini avec la nouvelle lib google-genai.
-    Retry automatique si quota temporairement dépassé (429).
-    """
+    """Appel Gemini via google-genai avec retry sur 429."""
     client = genai.Client(api_key=api_key)
-
     image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
     text_part  = types.Part.from_text(text=prompt)
     contents   = [types.Content(role="user", parts=[image_part, text_part])]
@@ -147,34 +172,62 @@ def call_gemini(api_key, prompt, image_bytes, mime_type, retries=3):
     for attempt in range(retries):
         try:
             response = client.models.generate_content(
-                model=get_model(),
+                model=get_gemini_model(),
                 contents=contents,
             )
-            raw = response.text.strip()
-            # Nettoyer les balises markdown si présentes
-            if "```" in raw:
-                raw = raw.split("```")[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-            return raw.strip()
-
+            return clean_raw(response.text.strip())
         except Exception as e:
             err_str = str(e)
-            # Détection erreur 429 (quota rate limit temporaire)
-            if "429" in err_str and "retry" in err_str.lower() and attempt < retries - 1:
-                # Extraire le délai suggéré par Google si disponible
+            if "429" in err_str and attempt < retries - 1:
                 wait = 20
-                try:
-                    import re
-                    match = re.search(r"retry_delay\s*\{\s*seconds:\s*(\d+)", err_str)
-                    if match:
-                        wait = int(match.group(1)) + 2
-                except Exception:
-                    pass
-                st.warning(f"⏳ Quota momentanément atteint, nouvelle tentative dans {wait}s… (tentative {attempt+1}/{retries})")
+                match = re.search(r"retry_delay\s*\{\s*seconds:\s*(\d+)", err_str)
+                if match:
+                    wait = int(match.group(1)) + 2
+                st.warning(f"⏳ Quota Gemini momentané, nouvelle tentative dans {wait}s… ({attempt+1}/{retries})")
                 time.sleep(wait)
                 continue
-            raise  # Toute autre erreur : on la remonte
+            raise
+
+def call_openrouter(api_key, prompt, b64_image, mime_type, retries=3):
+    """Appel OpenRouter via API compatible OpenAI avec retry sur 429."""
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
+    messages = [{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64_image}"}},
+        ]
+    }]
+
+    for attempt in range(retries):
+        try:
+            response = client.chat.completions.create(
+                model=get_openrouter_model(),
+                messages=messages,
+            )
+            return clean_raw(response.choices[0].message.content.strip())
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str and attempt < retries - 1:
+                st.warning(f"⏳ Quota OpenRouter momentané, nouvelle tentative dans 15s… ({attempt+1}/{retries})")
+                time.sleep(15)
+                continue
+            raise
+
+def call_ai(gemini_key, openrouter_key, prompt, image_bytes, mime_type, b64_image):
+    """Dispatcher : appelle le bon provider selon le choix de l'utilisateur."""
+    provider = get_provider()
+    if provider == "Gemini":
+        if not gemini_key:
+            raise ValueError("Clé API Gemini manquante.")
+        return call_gemini(gemini_key, prompt, image_bytes, mime_type)
+    else:
+        if not openrouter_key:
+            raise ValueError("Clé API OpenRouter manquante.")
+        return call_openrouter(openrouter_key, prompt, b64_image, mime_type)
 
 # ─────────────────────────────────────────────
 # SIDEBAR
@@ -186,16 +239,39 @@ with st.sidebar:
         st.rerun()
     st.markdown("---")
 
-    # Clé API — depuis les secrets Streamlit Cloud
-    try:
-        api_key = st.secrets["API_Key"]["GEMINI_API_KEY"]
-        st.success("🔑 Clé API chargée")
-    except Exception:
-        api_key = st.text_input("🔑 Clé API Google Gemini", type="password",
-                                 help="Gratuit sur https://aistudio.google.com",
-                                 placeholder="AIza...")
-        if api_key:
-            st.caption(f"Modèle : `{get_model()}`")
+    # ── Choix du provider ──
+    st.markdown("### 🔌 Provider IA")
+    provider_choice = st.radio(
+        "Provider",
+        ["Gemini (Google)", "OpenRouter"],
+        index=0 if get_provider() == "Gemini" else 1,
+        label_visibility="collapsed",
+        horizontal=True,
+    )
+    st.session_state["provider"] = "Gemini" if provider_choice == "Gemini (Google)" else "OpenRouter"
+
+    st.markdown("---")
+
+    # ── Clés API ──
+    gemini_key = ""
+    openrouter_key = ""
+
+    if get_provider() == "Gemini":
+        try:
+            gemini_key = st.secrets["API_Key"]["GEMINI_API_KEY"]
+            st.success("🔑 Clé Gemini chargée depuis les secrets")
+        except Exception:
+            gemini_key = st.text_input("🔑 Clé API Gemini", type="password",
+                                        placeholder="AIza...",
+                                        help="Gratuit sur https://aistudio.google.com")
+    else:
+        try:
+            openrouter_key = st.secrets["API_Key"]["OPEN_ROUTER_API_KEY"]
+            st.success("🔑 Clé OpenRouter chargée depuis les secrets")
+        except Exception:
+            openrouter_key = st.text_input("🔑 Clé API OpenRouter", type="password",
+                                            placeholder="sk-or-...",
+                                            help="Gratuit sur https://openrouter.ai")
 
     st.markdown("---")
     lang = st.selectbox("🌐 Langue", ["Français", "English", "Español", "Deutsch"])
@@ -203,15 +279,28 @@ with st.sidebar:
     # ── Sélecteur de modèle ──
     st.markdown("---")
     st.markdown("### 🤖 Modèle IA")
-    st.caption("Si quota atteint sur un modèle, bascule sur un autre")
-    model_keys = list(GEMINI_MODELS.keys())
-    model_labels = list(GEMINI_MODELS.values())
-    current_idx = model_keys.index(st.session_state.get("gemini_model", "gemini-2.0-flash-lite"))
-    chosen = st.radio("Modèle", model_labels, index=current_idx, label_visibility="collapsed")
-    st.session_state["gemini_model"] = model_keys[model_labels.index(chosen)]
-    st.caption(f"Sélectionné : `{st.session_state['gemini_model']}`")
+
+    if get_provider() == "Gemini":
+        st.caption("Si quota atteint, bascule sur un autre modèle")
+        g_keys   = list(GEMINI_MODELS.keys())
+        g_labels = list(GEMINI_MODELS.values())
+        g_cur    = get_gemini_model()
+        g_idx    = g_keys.index(g_cur)
+        g_chosen = st.radio("Modèle Gemini", g_labels, index=g_idx, label_visibility="collapsed")
+        st.session_state["gemini_model"] = g_keys[g_labels.index(g_chosen)]
+        st.caption(f"Actif : `{st.session_state['gemini_model']}`")
+    else:
+        st.caption("Tous ces modèles supportent la vision et sont gratuits")
+        or_keys   = list(OPENROUTER_MODELS.keys())
+        or_labels = list(OPENROUTER_MODELS.values())
+        or_cur    = get_openrouter_model()
+        or_idx    = or_keys.index(or_cur)
+        or_chosen = st.radio("Modèle OpenRouter", or_labels, index=or_idx, label_visibility="collapsed")
+        st.session_state["openrouter_model"] = or_keys[or_labels.index(or_chosen)]
+        st.caption(f"Actif : `{st.session_state['openrouter_model']}`")
 
     # ── Scanner ses poubelles par photo ──
+    active_key = gemini_key if get_provider() == "Gemini" else openrouter_key
     st.markdown("---")
     st.markdown("### 📷 Scanner mes poubelles")
     st.caption("Photographiez vos poubelles pour les configurer automatiquement via l'IA")
@@ -220,19 +309,17 @@ with st.sidebar:
     scan_image = None
     with scan_tab1:
         sc = st.camera_input("Photo poubelles", label_visibility="collapsed", key="cam_scan")
-        if sc:
-            scan_image = sc
+        if sc: scan_image = sc
     with scan_tab2:
         su = st.file_uploader("Image poubelles", type=["jpg","jpeg","png","webp"],
                                label_visibility="collapsed", key="up_scan")
-        if su:
-            scan_image = su
+        if su: scan_image = su
 
-    if scan_image and api_key:
+    if scan_image and active_key:
         if st.button("🤖 Détecter mes poubelles", use_container_width=True, type="primary"):
             with st.spinner("Analyse des poubelles en cours..."):
                 try:
-                    _, img_bytes, mime = prepare_image(scan_image)
+                    _, img_bytes, mime, b64 = prepare_image(scan_image)
                     prompt_scan = """Analyse cette photo de poubelles/conteneurs de tri.
 Identifie chaque poubelle visible (couleur, étiquette, type).
 Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
@@ -244,30 +331,26 @@ Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
   }
 ]
 Utilise un emoji de couleur correspondante dans le nom. Sois précis sur le contenu accepté."""
-                    raw = call_gemini(api_key, prompt_scan, img_bytes, mime)
+                    raw = call_ai(gemini_key, openrouter_key, prompt_scan, img_bytes, mime, b64)
                     detected = json.loads(raw)
                     st.session_state.bins = {
-                        b["name"]: {
-                            "description": b["description"],
-                            "couleur": b.get("couleur", "#888"),
-                            "active": True
-                        }
+                        b["name"]: {"description": b["description"], "couleur": b.get("couleur","#888"), "active": True}
                         for b in detected
                     }
                     st.success(f"✅ {len(detected)} poubelle(s) détectée(s) !")
                     st.rerun()
                 except json.JSONDecodeError:
-                    st.error("❌ L'IA n'a pas retourné un JSON valide, réessayez.")
+                    st.error("❌ Réponse JSON invalide, réessayez.")
                 except Exception as e:
                     err = str(e)
                     if "429" in err:
-                        st.error("❌ Quota journalier Gemini atteint. Réessayez demain ou vérifiez votre plan sur https://ai.dev/rate-limit")
+                        st.error("❌ Quota atteint. Changez de modèle ou de provider ci-dessus.")
                     else:
                         st.error(f"❌ Erreur : {e}")
-    elif scan_image and not api_key:
-        st.warning("Clé API requise pour scanner")
+    elif scan_image and not active_key:
+        st.warning("Clé API requise pour scanner.")
 
-    # ── Gestion manuelle ──
+    # ── Gestion manuelle des poubelles ──
     st.markdown("---")
     st.markdown("### 🗑️ Mes poubelles")
 
@@ -282,15 +365,13 @@ Utilise un emoji de couleur correspondante dans le nom. Sois précis sur le cont
                 to_delete.append(bname)
         if active:
             new_desc = st.text_area("", value=bdata["description"],
-                                     key=f"desc_{bname}", height=60,
-                                     label_visibility="collapsed")
+                                     key=f"desc_{bname}", height=60, label_visibility="collapsed")
             st.session_state.bins[bname]["description"] = new_desc
 
     for b in to_delete:
         del st.session_state.bins[b]
         st.rerun()
 
-    # ── Ajouter une poubelle ──
     st.markdown("---")
     st.markdown("### ➕ Ajouter une poubelle")
     with st.form("add_bin_form", clear_on_submit=True):
@@ -298,11 +379,7 @@ Utilise un emoji de couleur correspondante dans le nom. Sois précis sur le cont
         new_desc_add = st.text_area("Contenu accepté", height=60)
         new_color = st.color_picker("Couleur", "#4488ff")
         if st.form_submit_button("Ajouter", use_container_width=True) and new_name:
-            st.session_state.bins[new_name] = {
-                "description": new_desc_add,
-                "couleur": new_color,
-                "active": True
-            }
+            st.session_state.bins[new_name] = {"description": new_desc_add, "couleur": new_color, "active": True}
             st.success(f"✅ {new_name} ajoutée !")
             st.rerun()
 
@@ -313,16 +390,19 @@ Utilise un emoji de couleur correspondante dans le nom. Sois précis sur le cont
         }
         st.rerun()
 
+    provider_label = get_provider()
+    model_label = get_gemini_model() if get_provider() == "Gemini" else get_openrouter_model()
     st.markdown(f"""
     <div style='font-size:0.75rem;color:#666;text-align:center;margin-top:1rem'>
-    TriSmart v4.0 · {get_model()}<br>Google AI · Streamlit · 100% Gratuit
+    TriSmart v5.0 · {provider_label} · Streamlit · 100% Gratuit
     </div>""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────
 st.markdown('<div class="hero-title">♻️ TriSmart</div>', unsafe_allow_html=True)
-st.markdown(f'<div class="hero-sub">Détection intelligente des déchets · {get_model()} · Gratuit</div>', unsafe_allow_html=True)
+provider_display = "Gemini (Google)" if get_provider() == "Gemini" else "OpenRouter"
+st.markdown(f'<div class="hero-sub">Détection intelligente des déchets · {provider_display} · Gratuit</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -334,11 +414,14 @@ with col3:
 
 st.markdown("---")
 
-# Poubelles actives
 bins_config = {k: v for k, v in st.session_state.bins.items() if v.get("active")}
+active_key  = gemini_key if get_provider() == "Gemini" else openrouter_key
 
-if not api_key:
-    st.info("👈 **Entrez votre clé API Google Gemini** dans la barre latérale.\n\n🆓 Gratuite sur [aistudio.google.com](https://aistudio.google.com)")
+if not active_key:
+    if get_provider() == "Gemini":
+        st.info("👈 Clé API Gemini requise — gratuite sur [aistudio.google.com](https://aistudio.google.com)")
+    else:
+        st.info("👈 Clé API OpenRouter requise — gratuite sur [openrouter.ai](https://openrouter.ai)")
 
 # Résumé visuel des poubelles actives
 if bins_config:
@@ -373,15 +456,16 @@ with tab2:
 # ─────────────────────────────────────────────
 # ANALYSE DÉCHET
 # ─────────────────────────────────────────────
-if captured_image and api_key and bins_config:
-    img, img_bytes, mime_type = prepare_image(captured_image)
+if captured_image and active_key and bins_config:
+    img, img_bytes, mime_type, b64_img = prepare_image(captured_image)
 
     col_img, col_info = st.columns([1, 1])
     with col_img:
         st.image(img, caption=f"📷 {source_label}", use_container_width=True)
     with col_info:
         st.markdown("### 🔍 Prêt à analyser")
-        st.caption(f"{img.size[0]}×{img.size[1]}px · {get_model()}")
+        model_active = get_gemini_model() if get_provider() == "Gemini" else get_openrouter_model()
+        st.caption(f"{img.size[0]}×{img.size[1]}px · {model_active}")
         analyze = st.button("🤖 Analyser avec l'IA", use_container_width=True, type="primary")
 
     if analyze:
@@ -405,9 +489,9 @@ Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
   "emoji": "🥤"
 }}"""
 
-        with st.spinner("🤖 Analyse en cours..."):
+        with st.spinner(f"🤖 Analyse via {get_provider()}..."):
             try:
-                raw = call_gemini(api_key, prompt, img_bytes, mime_type)
+                raw = call_ai(gemini_key, openrouter_key, prompt, img_bytes, mime_type, b64_img)
                 result = json.loads(raw)
 
                 st.markdown("---")
@@ -475,17 +559,16 @@ Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
                 err = str(e)
                 if "429" in err:
                     st.error(
-                        "❌ **Quota Gemini atteint.**\n\n"
-                        "- Si c'est un quota **par minute** : attendez 1 minute et réessayez\n"
-                        "- Si c'est un quota **journalier** : revenez demain\n"
-                        "- Vérifiez votre usage sur https://ai.dev/rate-limit"
+                        "❌ **Quota atteint.**\n\n"
+                        "👉 Changez de modèle dans la sidebar\n"
+                        "👉 Ou basculez sur l'autre provider (Gemini ↔ OpenRouter)"
                     )
                 else:
                     st.error(f"❌ Erreur : {e}")
                     st.exception(e)
 
-elif captured_image and not api_key:
-    st.warning("⚠️ Clé API manquante.")
+elif captured_image and not active_key:
+    st.warning("⚠️ Clé API manquante dans la sidebar.")
 elif captured_image and not bins_config:
     st.warning("⚠️ Aucune poubelle active.")
 
@@ -508,5 +591,5 @@ with st.expander("📖 Guide de tri rapide (France)"):
 
 st.markdown(f"""
 <div style='text-align:center;color:#444;font-size:0.8rem;margin-top:2rem'>
-    TriSmart v4.0 · {get_model()} · Streamlit · 100% Gratuit
+    TriSmart v5.0 · Gemini + OpenRouter · Streamlit · 100% Gratuit
 </div>""", unsafe_allow_html=True)
