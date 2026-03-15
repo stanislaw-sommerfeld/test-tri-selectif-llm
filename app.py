@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as _stc
 from google import genai
 from google.genai import types
 from openai import OpenAI
@@ -19,15 +20,23 @@ st.set_page_config(
 # ══════════════════════════════════════════════
 # CSS — responsive PC · iOS · iPadOS · Android
 # ══════════════════════════════════════════════
+# NOTE: Google Fonts @import intentionally removed — it blocks iOS Safari
+# rendering on slow connections. We use the native system-ui font stack
+# (San Francisco on Apple, Roboto on Android) which loads instantly.
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-
-/* ── Base ── */
+/* ── Base — system font stack, no external @import ── */
 html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
     -webkit-text-size-adjust: 100%;
-    touch-action: manipulation;        /* suppress double-tap zoom on iOS/Android */
+    touch-action: manipulation;
+}
+
+/* ── Viewport height: use -webkit-fill-available as iOS fallback ── */
+.stApp {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
 }
 
 /* ── Safe-area insets — iPhone notch, Dynamic Island, home bar ── */
@@ -99,6 +108,7 @@ html, body, [class*="css"] {
     border-radius: 10px !important;
     width: 100%;
     -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;   /* prevent iOS default button styling */
 }
 
 /* ── Radio — larger touch area ── */
@@ -147,14 +157,14 @@ html, body, [class*="css"] {
     border-radius: 12px !important;
 }
 
-/* ── Selectbox / text inputs ── */
+/* ── Text inputs — font-size 16px prevents iOS auto-zoom on focus ── */
 .stSelectbox > div, .stTextInput > div > div {
     font-size: clamp(.85rem, 3vw, 1rem) !important;
 }
-/* font-size ≥ 16 px prevents iOS auto-zoom on focus */
-.stTextInput input, .stTextArea textarea {
+.stTextInput input, .stTextArea textarea, select {
     font-size: 16px !important;
     border-radius: 8px !important;
+    -webkit-appearance: none;   /* prevent iOS default input styling */
 }
 
 /* ── Checkboxes — bigger tap area ── */
@@ -194,11 +204,12 @@ html, body, [class*="css"] {
     .result-card { padding: 1rem !important; }
     [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
 
-    /* Sidebar: scrollable overlay on mobile */
+    /* Sidebar: scrollable overlay — use vh fallback for iOS < 15.4 */
     [data-testid="stSidebar"] {
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
-        max-height: 100dvh !important;
+        max-height: 100vh !important;
+        max-height: -webkit-fill-available !important;
     }
 }
 
@@ -210,7 +221,7 @@ html, body, [class*="css"] {
     [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
 }
 
-/* ══ LANDSCAPE PHONE (height ≤ 500 px) ══ */
+/* ══ LANDSCAPE PHONE ══ */
 @media (max-height: 500px) and (orientation: landscape) {
     .hero-title { font-size: 1.2rem; margin-bottom: .1rem; }
     .hero-sub   { margin-bottom: .5rem; }
@@ -237,14 +248,22 @@ LANGUAGES = {
 @st.cache_data
 def load_lang(code: str) -> dict:
     """Charge le fichier lang/{code}.json (mis en cache par Streamlit)."""
-    path = _os.path.join(_os.path.dirname(__file__), "lang", f"{code}.json")
+    try:
+        base = _os.path.dirname(_os.path.abspath(__file__))
+    except NameError:
+        base = _os.getcwd()
+    path = _os.path.join(base, "lang", f"{code}.json")
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 @st.cache_data
 def load_waste() -> dict:
     """Charge lang/waste.json (mis en cache)."""
-    path = _os.path.join(_os.path.dirname(__file__), "lang", "waste.json")
+    try:
+        base = _os.path.dirname(_os.path.abspath(__file__))
+    except NameError:
+        base = _os.getcwd()
+    path = _os.path.join(base, "lang", "waste.json")
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -391,21 +410,77 @@ def log_analysis(success, provider, model, objet="", role="guest"):
 # ══════════════════════════════════════════════
 # HELPERS LANGUE
 # ══════════════════════════════════════════════
+
+# Minimal inline fallback so the UI never crashes if lang/*.json are missing
+_FALLBACK_STRINGS = {
+    "login_title": "Login", "login_subtitle": "AI Waste Sorting",
+    "username": "Username", "password": "Password",
+    "login_btn": "Log in", "login_error": "Invalid credentials",
+    "guest_btn": "Continue without account",
+    "guest_hint": "Guests can analyse waste but cannot access the dashboard.",
+    "logout": "Log out", "config": "Settings", "dashboard": "Dashboard",
+    "lang_label": "Language", "country_label": "Country",
+    "provider": "Provider", "model_label": "Model",
+    "tab_camera": "📷 Camera", "tab_upload": "🖼️ Upload",
+    "analyze_btn": "🔍 Analyse", "ready": "Image ready.",
+    "result_title": "### 🎯 Result", "material": "Material",
+    "confidence": "Confidence", "recyclable": "✅ Recyclable",
+    "not_recyclable": "❌ Not recyclable", "dangerous": "⚠️ Hazardous",
+    "not_dangerous": "✅ Not hazardous", "gestures": "**Tips:**",
+    "alternatives": "**Alternatives:**", "debug_title": "Debug / JSON",
+    "guide_title": "Sorting guide", "guide_tip": "Check your local rules.",
+    "key_missing_main": "Add your API key in the sidebar ←",
+    "no_bin_active": "Enable at least one bin in the sidebar.",
+    "json_err": "JSON parse error", "quota_err": "Quota exceeded (429). Try another model.",
+    "err_prefix": "Error", "scan_title": "Scan bins",
+    "scan_hint": "Photograph your bins to configure them automatically.",
+    "scan_btn": "Identify bins", "scan_success": "bins detected",
+    "scan_added": "added", "scan_updated": "updated",
+    "scan_err_json": "Could not parse bin data.", "scan_key_missing": "API key missing.",
+    "scan_err_quota": "Quota exceeded.",
+    "bins_title": "Active bins", "add_title": "Add a bin",
+    "bin_name_ph": "Bin name", "bin_content": "Accepted content",
+    "add_btn": "Add", "reset_btn": "Reset to defaults",
+    "key_loaded_gemini": "✅ Gemini key loaded",
+    "key_miss_gemini": "⚠️ Gemini key missing",
+    "key_loaded_or": "✅ OpenRouter key loaded",
+    "key_miss_or": "⚠️ OpenRouter key missing",
+    "model_hint_gemini": "Choose a Gemini model:",
+    "model_hint_or": "Choose an OpenRouter model:",
+    "step1": "Photo", "step2": "Analyse", "step3": "Sort",
+    "dash_total": "Total", "dash_ok": "Success", "dash_err": "Errors",
+    "dash_guest": "Guest", "dash_log": "**Log:**",
+    "dash_stats": "**Stats:**", "dash_by_provider": "By provider",
+    "dash_by_role": "By role", "dash_top": "**Top objects:**",
+    "dash_clear": "Clear log", "dash_empty": "No analyses yet.",
+    "ai_lang": "English",
+}
+
 def get_lang_code():
     label = st.session_state.get("ui_lang", "Français 🇫🇷")
     return LANGUAGES.get(label, "fr")
 
-def t(key):
+def t(key: str) -> str:
+    """Return UI string for current language, with robust fallback chain."""
     lc = get_lang_code()
-    lang_data = load_lang(lc)
-    if key in lang_data:
-        return lang_data[key]
-    # fallback to English
-    en_data = load_lang("en")
-    return en_data.get(key, key)
+    try:
+        val = load_lang(lc).get(key)
+        if val is not None:
+            return val
+        # fallback 1: English json
+        val = load_lang("en").get(key)
+        if val is not None:
+            return val
+    except Exception:
+        pass
+    # fallback 2: inline dict (works even if lang/ folder is missing)
+    return _FALLBACK_STRINGS.get(key, key)
 
 def get_ai_lang():
-    return load_lang(get_lang_code()).get("ai_lang", "English")
+    try:
+        return load_lang(get_lang_code()).get("ai_lang", "English")
+    except Exception:
+        return "English"
 
 # ══════════════════════════════════════════════
 # LOGIN SCREEN
@@ -430,12 +505,16 @@ def login_screen():
             st.session_state["ui_lang"] = chosen_lang
             st.rerun()
 
+    # background-clip needs both vendor prefix and standard for full Safari support
     st.markdown(f"""
     <div style="max-width:400px;margin:2rem auto 0;text-align:center">
-        <div style="font-size:3rem">♻️</div>
-        <div style="font-size:1.8rem;font-weight:700;background:linear-gradient(135deg,#00d084,#00a8ff);
-            -webkit-background-clip:text;-webkit-text-fill-color:transparent">TriSmart</div>
-        <div style="color:#666;margin:.5rem 0 1.5rem">{t('login_subtitle')}</div>
+        <div style="font-size:3rem;line-height:1">♻️</div>
+        <div style="font-size:1.8rem;font-weight:700;
+            background:linear-gradient(135deg,#00d084,#00a8ff);
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+            background-clip:text;color:transparent;
+            margin:.4rem 0">TriSmart</div>
+        <div style="color:#888;margin:.3rem 0 1.5rem;font-size:.95rem">{t('login_subtitle')}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -443,8 +522,12 @@ def login_screen():
     with col2:
         with st.form("login_form"):
             st.markdown(f"#### {t('login_title')}")
-            username = st.text_input(t("username"), placeholder="username")
-            password = st.text_input(t("password"), type="password", placeholder="••••••••")
+            # autocomplete hints help iOS Keychain / password managers
+            username = st.text_input(t("username"), placeholder="username",
+                                     autocomplete="username")
+            password = st.text_input(t("password"), type="password",
+                                     placeholder="••••••••",
+                                     autocomplete="current-password")
             if st.form_submit_button(t("login_btn"), use_container_width=True, type="primary"):
                 if check_admin(username, password):
                     st.session_state["role"] = "admin"
@@ -687,12 +770,23 @@ with st.sidebar:
     scan_tab1, scan_tab2 = st.tabs(["📷","🖼️"])
     scan_image = None
     with scan_tab1:
-        sc = st.camera_input("", label_visibility="collapsed", key="cam_scan")
-        if sc: scan_image = sc
+        # Gate camera_input to avoid iOS Safari freeze on sidebar open
+        if "scan_cam_active" not in st.session_state:
+            st.session_state["scan_cam_active"] = False
+        if not st.session_state["scan_cam_active"]:
+            if st.button("📷 " + ("Activer" if get_lang_code()=="fr" else "Activate"),
+                         use_container_width=True, type="secondary", key="btn_scan_cam"):
+                st.session_state["scan_cam_active"] = True
+                st.rerun()
+        else:
+            sc = st.camera_input("", label_visibility="collapsed", key="cam_scan")
+            if sc: scan_image = sc
     with scan_tab2:
         su = st.file_uploader("", type=["jpg","jpeg","png","webp","heic","heif"],
                                label_visibility="collapsed", key="up_scan")
-        if su: scan_image = su
+        if su:
+            scan_image = su
+            st.session_state["scan_cam_active"] = False  # reset if user switched to upload
 
     if scan_image and active_key:
         if st.button(t("scan_btn"), use_container_width=True, type="primary"):
@@ -757,7 +851,7 @@ Use a matching color emoji in the name. Be precise about accepted content."""
         st.rerun()
 
     st.markdown(f"""<div style='font-size:.7rem;color:#555;text-align:center;margin-top:.8rem'>
-    TriSmart v8.0 · {get_provider()} · Free</div>""", unsafe_allow_html=True)
+    TriSmart v10.0 · {get_provider()} · Free</div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # DASHBOARD
@@ -766,11 +860,13 @@ if is_admin() and st.session_state.get("show_dashboard", False):
     st.markdown(f"## {t('dashboard')}")
     logs  = st.session_state.usage_log
     total = len(logs)
-    c1,c2,c3,c4 = st.columns(4)
-    c1.metric(t("dash_total"), total)
-    c2.metric(t("dash_ok"),    sum(1 for l in logs if l["success"]))
-    c3.metric(t("dash_err"),   sum(1 for l in logs if not l["success"]))
-    c4.metric(t("dash_guest"), sum(1 for l in logs if l["role"]=="guest"))
+    # 4 metrics in 2×2 grid — safe on all screen widths
+    r1c1, r1c2 = st.columns(2)
+    r2c1, r2c2 = st.columns(2)
+    r1c1.metric(t("dash_total"), total)
+    r1c2.metric(t("dash_ok"),    sum(1 for l in logs if l["success"]))
+    r2c1.metric(t("dash_err"),   sum(1 for l in logs if not l["success"]))
+    r2c2.metric(t("dash_guest"), sum(1 for l in logs if l["role"]=="guest"))
 
     if logs:
         st.markdown(t("dash_log"))
@@ -809,10 +905,15 @@ if is_admin() and st.session_state.get("show_dashboard", False):
 st.markdown('<div class="hero-title">♻️ TriSmart</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="hero-sub">AI Waste Sorting · {get_provider()} · Free</div>', unsafe_allow_html=True)
 
-c1,c2,c3 = st.columns(3)
-with c1: st.markdown(f'<span class="step-badge">1</span> {t("step1")}', unsafe_allow_html=True)
-with c2: st.markdown(f'<span class="step-badge">2</span> {t("step2")}', unsafe_allow_html=True)
-with c3: st.markdown(f'<span class="step-badge">3</span> {t("step3")}', unsafe_allow_html=True)
+# Step badges — pure HTML row, never overflows on any screen width
+st.markdown(f"""
+<div style="display:flex;justify-content:center;gap:clamp(.5rem,3vw,2rem);
+    flex-wrap:wrap;margin-bottom:.8rem;font-size:clamp(.8rem,3vw,.95rem);color:#ccc">
+  <span><span class="step-badge">1</span>{t('step1')}</span>
+  <span><span class="step-badge">2</span>{t('step2')}</span>
+  <span><span class="step-badge">3</span>{t('step3')}</span>
+</div>
+""", unsafe_allow_html=True)
 st.markdown("---")
 
 bins_config = {k:v for k,v in st.session_state.bins.items() if v.get("active")}
@@ -822,25 +923,19 @@ if not active_key:
     st.info(f"👈 {t('key_missing_main')}")
 
 if bins_config:
-    n_cols = min(len(bins_config), 4)
-    cols = st.columns(n_cols)
-    for i,(bname,bdata) in enumerate(bins_config.items()):
-        with cols[i % n_cols]:
-            st.markdown(f"""<div style="background:{bdata['couleur']}22;border:1px solid {bdata['couleur']};
-                border-radius:8px;padding:6px;text-align:center;font-size:.75rem;color:#ddd;margin-bottom:4px">
-                {bname}</div>""", unsafe_allow_html=True)
+    # CSS grid: 4 cols on desktop, 2 on mobile — avoids st.columns overflow
+    cards_html = "".join(
+        f'<div style="background:{v["couleur"]}22;border:1px solid {v["couleur"]};'
+        f'border-radius:8px;padding:8px 4px;text-align:center;font-size:.78rem;'
+        f'color:#ddd;line-height:1.3;word-break:break-word">{k}</div>'
+        for k, v in bins_config.items()
+    )
+    st.markdown(
+        f'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));'
+        f'gap:6px;margin-bottom:.5rem">{cards_html}</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown("")
-
-# ══════════════════════════════════════════════
-# CAPTURE — adaptatif mobile/desktop
-# ══════════════════════════════════════════════
-# Sur mobile : file_uploader avec accept="image/*;capture=environment"
-# déclenche l'appareil photo natif (iOS + Android, plus fiable que st.camera_input)
-# Sur desktop : st.camera_input pour le flux webcam en direct
-#
-# Détection : on laisse l'utilisateur choisir son mode si besoin
-
-import streamlit.components.v1 as _stc
 
 # ══════════════════════════════════════════════
 # CAPTURE — PC · iOS · iPadOS · Android
@@ -855,7 +950,9 @@ import streamlit.components.v1 as _stc
 #                                reliable approach on WebKit.
 #   All platforms             →  Gallery/upload tab always available.
 #
-# The iOS hint message is translated into all 7 UI languages.
+# NOTE: _stc.html() with postMessage intentionally NOT used — injected iframes
+# block the Streamlit WebSocket handshake on iOS Safari, causing the
+# skeleton loading screen to freeze permanently.
 # ──────────────────────────────────────────────
 
 _IOS_HINT = {
@@ -907,15 +1004,32 @@ with tab1:
 
     facing_mode = "user" if st.session_state.get("cam_facing","back")=="front" else "environment"
 
-    # Primary: st.camera_input — best on desktop and Android Chrome
-    cam = st.camera_input("", label_visibility="collapsed", key=f"cam_{facing_mode}")
-    if cam:
-        captured_image = cam
-        source_label   = t("tab_camera")
+    # ── st.camera_input — gated to avoid freezing iOS on page load ──
+    # On iOS Safari, requesting camera permission during initial render can
+    # interrupt the WebSocket handshake and cause the skeleton freeze.
+    # Solution: only mount camera_input after the user explicitly activates it.
+    if "cam_active" not in st.session_state:
+        st.session_state["cam_active"] = False
 
-    # iOS / iPadOS / WebKit fallback
-    # A file_uploader with type=image/* shows the native iOS action sheet
-    # (Camera / Photo Library / Files) — far more reliable than camera_input on Safari.
+    _activate_label = {
+        "fr":"📷 Activer la caméra","en":"📷 Activate camera",
+        "de":"📷 Kamera aktivieren","es":"📷 Activar cámara",
+        "ko":"📷 카메라 활성화","zh":"📷 启用摄像头","ja":"📷 カメラを起動",
+    }
+    if not st.session_state["cam_active"]:
+        if st.button(_activate_label.get(_lc, "📷 Activate camera"),
+                     use_container_width=True, type="secondary", key="btn_activate_cam"):
+            st.session_state["cam_active"] = True
+            st.rerun()
+    else:
+        cam = st.camera_input("", label_visibility="collapsed", key=f"cam_{facing_mode}")
+        if cam:
+            captured_image = cam
+            source_label   = t("tab_camera")
+
+    # ── iOS / iPadOS / WebKit fallback (always visible) ──
+    # A standard file_uploader with image/* triggers the native iOS action
+    # sheet (Camera / Photo Library / Files) — most reliable on Safari.
     st.markdown(
         f"<div style='text-align:center;color:#555;font-size:.8rem;margin:.6rem 0'>"
         f"{_IOS_HINT.get(_lc, _IOS_HINT['en'])}</div>",
@@ -933,6 +1047,9 @@ with tab1:
         source_label   = "photo"
 
 with tab2:
+    # Reset camera activation state when user switches to upload tab
+    if st.session_state.get("cam_active"):
+        st.session_state["cam_active"] = False
     upl = st.file_uploader(
         "", type=["jpg","jpeg","png","webp","heic","heif"],
         label_visibility="collapsed", key="up_dechet",
@@ -1087,5 +1204,5 @@ with st.expander(f"{t('guide_title')} — {country}"):
 
 st.markdown("""
 <div style='text-align:center;color:#444;font-size:.8rem;margin-top:2rem'>
-TriSmart v8.0 · Gemini + OpenRouter · Streamlit · Free
+TriSmart v8.1 · Gemini + OpenRouter · Streamlit · Free
 </div>""", unsafe_allow_html=True)
