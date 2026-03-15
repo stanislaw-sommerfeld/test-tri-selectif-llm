@@ -1204,5 +1204,5 @@ with st.expander(f"{t('guide_title')} — {country}"):
 
 st.markdown("""
 <div style='text-align:center;color:#444;font-size:.8rem;margin-top:2rem'>
-TriSmart v8.1 · Gemini + OpenRouter · Streamlit · Free
+TriSmart v8.2 · Gemini + OpenRouter · Streamlit · Free
 </div>""", unsafe_allow_html=True)
