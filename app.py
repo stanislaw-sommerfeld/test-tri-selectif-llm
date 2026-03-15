@@ -851,7 +851,7 @@ Use a matching color emoji in the name. Be precise about accepted content."""
         st.rerun()
 
     st.markdown(f"""<div style='font-size:.7rem;color:#555;text-align:center;margin-top:.8rem'>
-    TriSmart v10.0 · {get_provider()} · Free</div>""", unsafe_allow_html=True)
+    TriSmart v11.0 · {get_provider()} · Free</div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # DASHBOARD
@@ -956,98 +956,253 @@ if bins_config:
 # ──────────────────────────────────────────────
 
 _IOS_HINT = {
-    "fr": "— Problème de caméra ? Utilisez le bouton ci-dessous —",
-    "en": "— Camera not working? Use the button below —",
-    "de": "— Kamera funktioniert nicht? Schaltfläche unten nutzen —",
-    "es": "— ¿Cámara no funciona? Use el botón de abajo —",
-    "ko": "— 카메라 문제? 아래 버튼을 사용하세요 —",
-    "zh": "— 相机有问题？请使用下方按钮 —",
-    "ja": "— カメラが使えない場合は下のボタンを使ってください —",
+    "fr": "iOS / Safari : utilisez ce bouton",
+    "en": "iOS / Safari: use this button",
+    "de": "iOS / Safari: diese Schaltflaeche nutzen",
+    "es": "iOS / Safari: use este boton",
+    "ko": "iOS / Safari: 이 버튼 사용",
+    "zh": "iOS / Safari: 使用此按钮",
+    "ja": "iOS / Safari: このボタンを使用",
 }
 _IOS_BTN = {
-    "fr": "📸 Prendre une photo (iOS / Safari)",
-    "en": "📸 Take a photo (iOS / Safari)",
-    "de": "📸 Foto aufnehmen (iOS / Safari)",
-    "es": "📸 Tomar una foto (iOS / Safari)",
-    "ko": "📸 사진 찍기 (iOS / Safari)",
-    "zh": "📸 拍照 (iOS / Safari)",
-    "ja": "📸 写真を撮る (iOS / Safari)",
+    "fr": "Prendre une photo (iOS / Safari)",
+    "en": "Take a photo (iOS / Safari)",
+    "de": "Foto aufnehmen (iOS / Safari)",
+    "es": "Tomar una foto (iOS / Safari)",
+    "ko": "사진 찍기 (iOS / Safari)",
+    "zh": "拍照 (iOS / Safari)",
+    "ja": "写真を撮る (iOS / Safari)",
 }
-_REAR = {
-    "fr": "📷 Caméra arrière", "en": "📷 Rear camera",
-    "de": "📷 Rückkamera",     "es": "📷 Cámara trasera",
-    "ko": "📷 후면 카메라",      "zh": "📷 后置摄像头",    "ja": "📷 背面カメラ",
+_ACTIVATE_CAM = {
+    "fr": "Activer la camera", "en": "Activate camera",
+    "de": "Kamera aktivieren", "es": "Activar camara",
+    "ko": "카메라 활성화",       "zh": "启用摄像头",      "ja": "カメラを起動",
 }
-_FRONT = {
-    "fr": "🤳 Caméra frontale", "en": "🤳 Front camera",
-    "de": "🤳 Frontkamera",     "es": "🤳 Cámara frontal",
-    "ko": "🤳 전면 카메라",      "zh": "🤳 前置摄像头",    "ja": "🤳 前面カメラ",
+_CAPTURE_BTN = {
+    "fr": "Prendre la photo", "en": "Take photo",
+    "de": "Aufnehmen",        "es": "Tomar foto",
+    "ko": "촬영",              "zh": "拍照",            "ja": "撮影",
+}
+_RETAKE_BTN = {
+    "fr": "Reprendre", "en": "Retake",
+    "de": "Wiederholen","es": "Repetir",
+    "ko": "다시 찍기",   "zh": "重拍",              "ja": "撮り直す",
 }
 
 _lc = get_lang_code()
+
+# Initialise camera state
+if "cam_active"  not in st.session_state: st.session_state["cam_active"]  = False
+if "cam_facing"  not in st.session_state: st.session_state["cam_facing"]  = "environment"
+if "cam_b64"     not in st.session_state: st.session_state["cam_b64"]     = ""
 
 tab1, tab2 = st.tabs([t("tab_camera"), t("tab_upload")])
 captured_image = None
 source_label   = ""
 
 with tab1:
-    # Front / rear camera toggle
-    cam_col1, cam_col2 = st.columns(2)
-    with cam_col1:
-        if st.button(_REAR.get(_lc, "📷 Rear camera"), use_container_width=True,
-                     type="primary" if st.session_state.get("cam_facing","back")=="back" else "secondary"):
-            st.session_state["cam_facing"] = "back"; st.rerun()
-    with cam_col2:
-        if st.button(_FRONT.get(_lc, "🤳 Front camera"), use_container_width=True,
-                     type="primary" if st.session_state.get("cam_facing","back")=="front" else "secondary"):
-            st.session_state["cam_facing"] = "front"; st.rerun()
 
-    facing_mode = "user" if st.session_state.get("cam_facing","back")=="front" else "environment"
-
-    # ── st.camera_input — gated to avoid freezing iOS on page load ──
-    # On iOS Safari, requesting camera permission during initial render can
-    # interrupt the WebSocket handshake and cause the skeleton freeze.
-    # Solution: only mount camera_input after the user explicitly activates it.
-    if "cam_active" not in st.session_state:
-        st.session_state["cam_active"] = False
-
-    _activate_label = {
-        "fr":"📷 Activer la caméra","en":"📷 Activate camera",
-        "de":"📷 Kamera aktivieren","es":"📷 Activar cámara",
-        "ko":"📷 카메라 활성화","zh":"📷 启用摄像头","ja":"📷 カメラを起動",
-    }
     if not st.session_state["cam_active"]:
-        if st.button(_activate_label.get(_lc, "📷 Activate camera"),
-                     use_container_width=True, type="secondary", key="btn_activate_cam"):
+        # ── Activate button — camera permission not requested until tapped ──
+        if st.button(
+            "📷  " + _ACTIVATE_CAM.get(_lc, "Activate camera"),
+            use_container_width=True, type="primary", key="btn_activate_cam"
+        ):
             st.session_state["cam_active"] = True
+            st.session_state["cam_b64"]    = ""
             st.rerun()
-    else:
-        cam = st.camera_input("", label_visibility="collapsed", key=f"cam_{facing_mode}")
-        if cam:
-            captured_image = cam
-            source_label   = t("tab_camera")
 
-    # ── iOS / iPadOS / WebKit fallback (always visible) ──
-    # A standard file_uploader with image/* triggers the native iOS action
-    # sheet (Camera / Photo Library / Files) — most reliable on Safari.
+    else:
+        facing = st.session_state["cam_facing"]
+
+        # ── Single swap button ──
+        swap_icon  = "⬅️ Avant" if facing == "environment" else "Arriere ➡️"
+        if _lc != "fr":
+            swap_icon = "⬅️ Front" if facing == "environment" else "Rear ➡️"
+        swap_col, _ = st.columns([1, 4])
+        with swap_col:
+            if st.button(swap_icon, use_container_width=True,
+                         type="secondary", key="btn_swap_cam"):
+                st.session_state["cam_facing"] = (
+                    "user" if facing == "environment" else "environment"
+                )
+                st.session_state["cam_b64"] = ""
+                st.rerun()
+
+        cap_lbl = _CAPTURE_BTN.get(_lc, "Take photo")
+        ret_lbl = _RETAKE_BTN.get(_lc, "Retake")
+
+        # ── Custom JS camera — proper facingMode, capture→base64→session_state ──
+        # We inject a tiny <textarea id="st-cam-out"> that Streamlit's st.text_area
+        # widget reads via its key. The JS writes the base64 JPEG there and
+        # dispatches an 'input' event so Streamlit picks it up.
+        cam_html = f"""
+<style>
+#cam-wrap{{width:100%;max-width:540px;margin:0 auto;font-family:inherit}}
+#cam-video{{width:100%;border-radius:12px;display:block;background:#111;
+            min-height:220px}}
+#cam-preview{{display:none;width:100%;border-radius:12px}}
+#cam-err{{color:#f88;font-size:.85rem;text-align:center;padding:.4rem 0;
+           display:none}}
+.cam-btn{{width:100%;min-height:52px;border:none;border-radius:10px;
+          font-size:1rem;font-weight:700;cursor:pointer;
+          -webkit-appearance:none;margin-top:8px;transition:.15s}}
+#btn-capture{{background:#00d084;color:#000}}
+#btn-capture:active{{opacity:.8}}
+#btn-retake{{background:#333;color:#eee;display:none}}
+</style>
+<div id="cam-wrap">
+  <video id="cam-video" autoplay playsinline muted></video>
+  <canvas id="cam-canvas" style="display:none"></canvas>
+  <img   id="cam-preview" alt="captured"/>
+  <div   id="cam-err"></div>
+  <button id="btn-capture" class="cam-btn">📸 {cap_lbl}</button>
+  <button id="btn-retake"  class="cam-btn">🔄 {ret_lbl}</button>
+</div>
+<script>
+(function(){{
+  var facing  = "{facing}";
+  var video   = document.getElementById("cam-video");
+  var canvas  = document.getElementById("cam-canvas");
+  var preview = document.getElementById("cam-preview");
+  var errDiv  = document.getElementById("cam-err");
+  var btnCap  = document.getElementById("btn-capture");
+  var btnRet  = document.getElementById("btn-retake");
+  var stream  = null;
+
+  function showErr(msg){{
+    errDiv.textContent = "⚠️ " + msg;
+    errDiv.style.display = "block";
+    btnCap.disabled = true;
+  }}
+
+  function startCam(){{
+    var constraints = {{
+      video: {{ facingMode: {{ ideal: facing }}, width: {{ideal:1280}}, height: {{ideal:720}} }},
+      audio: false
+    }};
+    navigator.mediaDevices.getUserMedia(constraints)
+      .then(function(s){{
+        stream = s;
+        video.srcObject = s;
+        errDiv.style.display = "none";
+        btnCap.disabled = false;
+      }})
+      .catch(function(e){{ showErr(e.message || e.name); }});
+  }}
+
+  btnCap.addEventListener("click", function(){{
+    if (!stream) return;
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    var dataUrl = canvas.toDataURL("image/jpeg", 0.88);
+    // show preview
+    preview.src = dataUrl;
+    video.style.display   = "none";
+    preview.style.display = "block";
+    btnCap.style.display  = "none";
+    btnRet.style.display  = "block";
+    // stop stream (free camera LED)
+    stream.getTracks().forEach(function(t){{ t.stop(); }});
+    stream = null;
+    // send to bridge listener
+    window.parent.postMessage({{ type: "cam_photo", value: dataUrl }}, "*");
+  }});
+
+  btnRet.addEventListener("click", function(){{
+    preview.style.display = "none";
+    video.style.display   = "block";
+    btnRet.style.display  = "none";
+    btnCap.style.display  = "block";
+    btnCap.disabled = true;
+    startCam();
+  }});
+
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia){{
+    startCam();
+  }} else {{
+    showErr("Camera API not available in this browser.");
+  }}
+}})();
+</script>
+"""
+        # ── Render camera widget ──
+        _stc.html(cam_html, height=380)
+
+        # ── Receive captured photo ──
+        # The JS cannot directly write to st.session_state.
+        # We place a hidden st.text_area whose DOM textarea the JS fills,
+        # then triggers an 'input' event. On next rerun Streamlit reads it.
+        # We hide it with CSS so the user never sees it.
+        st.markdown(
+            "<style>#cam-b64-area{opacity:0;height:1px;padding:0;margin:0;"
+            "pointer-events:none;position:absolute}</style>",
+            unsafe_allow_html=True,
+        )
+        cam_b64_raw = st.text_area(
+            "", key="cam_b64_input",
+            value=st.session_state.get("cam_b64", ""),
+            label_visibility="collapsed",
+            height=1,
+        )
+        # JS target: the textarea rendered for key "cam_b64_input"
+        # We inject a small bridge script to wire JS → textarea
+        bridge = """
+<script>
+(function waitForTextarea() {
+  var ta = window.parent.document.querySelector(
+    'textarea[data-testid="stTextArea"]');
+  if (!ta) { setTimeout(waitForTextarea, 200); return; }
+  ta.id = "cam-b64-area";
+  window.addEventListener("message", function(ev) {
+    if (ev.data && ev.data.type === "cam_photo") {
+      ta.value = ev.data.value;
+      ta.dispatchEvent(new Event("input", {bubbles:true}));
+      ta.dispatchEvent(new Event("change", {bubbles:true}));
+    }
+  });
+})();
+</script>"""
+        _stc.html(bridge, height=0)
+
+        if cam_b64_raw and cam_b64_raw.startswith("data:image"):
+            try:
+                header, b64data = cam_b64_raw.split(",", 1)
+                img_bytes_js = base64.b64decode(b64data)
+                captured_image = io.BytesIO(img_bytes_js)
+                captured_image.name = "camera.jpg"
+                source_label = t("tab_camera")
+                st.session_state["cam_b64"] = cam_b64_raw
+            except Exception:
+                pass
+
+        # Fallback: standard camera_input for Android Chrome
+        with st.expander("📷 " + ("Autre option" if _lc=="fr" else "Alternative"), expanded=False):
+            std_cam = st.camera_input("", label_visibility="collapsed",
+                                      key=f"stdcam_{facing}")
+            if std_cam:
+                captured_image = std_cam
+                source_label   = t("tab_camera")
+
+    # ── iOS / Safari native fallback — file input with capture attribute ──
+    # This triggers the native iOS camera/photo picker — most reliable on WebKit.
     st.markdown(
-        f"<div style='text-align:center;color:#555;font-size:.8rem;margin:.6rem 0'>"
-        f"{_IOS_HINT.get(_lc, _IOS_HINT['en'])}</div>",
+        f"<div style='text-align:center;color:#666;font-size:.78rem;margin:.5rem 0'>"
+        f"📱 {_IOS_HINT.get(_lc, _IOS_HINT['en'])}</div>",
         unsafe_allow_html=True,
     )
     ios_file = st.file_uploader(
-        _IOS_BTN.get(_lc, _IOS_BTN["en"]),
+        "📸  " + _IOS_BTN.get(_lc, _IOS_BTN["en"]),
         type=["jpg", "jpeg", "png", "webp", "heic", "heif"],
         label_visibility="visible",
         key="ios_cam",
-        help="📱 iOS Safari / iPadOS — opens native camera / photo picker",
     )
     if ios_file:
         captured_image = ios_file
         source_label   = "photo"
 
 with tab2:
-    # Reset camera activation state when user switches to upload tab
     if st.session_state.get("cam_active"):
         st.session_state["cam_active"] = False
     upl = st.file_uploader(
@@ -1204,5 +1359,5 @@ with st.expander(f"{t('guide_title')} — {country}"):
 
 st.markdown("""
 <div style='text-align:center;color:#444;font-size:.8rem;margin-top:2rem'>
-TriSmart v8.2 · Gemini + OpenRouter · Streamlit · Free
+TriSmart v8.3 · Gemini + OpenRouter · Streamlit · Free
 </div>""", unsafe_allow_html=True)
