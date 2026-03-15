@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # ══════════════════════════════════════════════
-# CSS — responsive mobile + tablet + desktop
+# CSS — responsive PC · iOS · iPadOS · Android
 # ══════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -27,6 +27,17 @@ st.markdown("""
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
     -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;        /* suppress double-tap zoom on iOS/Android */
+}
+
+/* ── Safe-area insets — iPhone notch, Dynamic Island, home bar ── */
+.block-container {
+    padding-left:   max(1rem, env(safe-area-inset-left))   !important;
+    padding-right:  max(1rem, env(safe-area-inset-right))  !important;
+    padding-top:    max(1rem, env(safe-area-inset-top))    !important;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+    max-width: 860px !important;
+    margin: 0 auto !important;
 }
 
 /* ── Hero ── */
@@ -36,6 +47,7 @@ html, body, [class*="css"] {
     background: linear-gradient(135deg, #00d084, #00a8ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    background-clip: text;
     text-align: center;
     margin-bottom: .2rem;
     line-height: 1.2;
@@ -80,43 +92,45 @@ html, body, [class*="css"] {
     color: #aaa;
 }
 
-/* ── Main content — full width on mobile ── */
-.block-container {
-    padding-left: max(1rem, env(safe-area-inset-left)) !important;
-    padding-right: max(1rem, env(safe-area-inset-right)) !important;
-    padding-top: 1rem !important;
-    max-width: 100% !important;
-}
-
-/* ── Buttons — bigger tap targets on mobile ── */
+/* ── Buttons — 48 px minimum tap target (Apple HIG / WCAG 2.5.5) ── */
 .stButton > button {
     min-height: 48px;
     font-size: clamp(.9rem, 3vw, 1rem) !important;
     border-radius: 10px !important;
     width: 100%;
+    -webkit-tap-highlight-color: transparent;
 }
 
-/* ── Radio buttons — larger tap area ── */
+/* ── Radio — larger touch area ── */
 .stRadio label {
     font-size: clamp(.85rem, 3vw, 1rem) !important;
-    padding: 6px 4px;
+    padding: 8px 4px;
+    cursor: pointer;
 }
+.stRadio [data-baseweb="radio"] { padding: 4px 0; }
 
-/* ── Tabs — fill width, bigger text ── */
+/* ── Tabs — fill width, scrollable, easy tap ── */
 .stTabs [data-baseweb="tab"] {
     font-size: clamp(.85rem, 3vw, 1rem) !important;
-    padding: 10px 16px !important;
+    padding: 12px 16px !important;
     flex: 1;
     text-align: center;
+    min-height: 48px;
 }
 .stTabs [data-baseweb="tab-list"] {
     width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
 }
 
 /* ── Expander ── */
 .stExpander summary {
     font-size: clamp(.85rem, 3vw, 1rem) !important;
-    padding: 10px !important;
+    padding: 12px !important;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
 }
 
 /* ── Camera input — full width ── */
@@ -126,43 +140,81 @@ html, body, [class*="css"] {
     border-radius: 12px !important;
 }
 
-/* ── File uploader ── */
-.stFileUploader > div {
-    width: 100% !important;
+/* ── File uploader — bigger drop zone ── */
+.stFileUploader > div { width: 100% !important; }
+.stFileUploader [data-testid="stFileUploaderDropzone"] {
+    min-height: 80px;
+    border-radius: 12px !important;
 }
 
-/* ── Selectbox / inputs ── */
+/* ── Selectbox / text inputs ── */
 .stSelectbox > div, .stTextInput > div > div {
     font-size: clamp(.85rem, 3vw, 1rem) !important;
 }
+/* font-size ≥ 16 px prevents iOS auto-zoom on focus */
+.stTextInput input, .stTextArea textarea {
+    font-size: 16px !important;
+    border-radius: 8px !important;
+}
 
-/* ── Sidebar — collapse by default on mobile ── */
+/* ── Checkboxes — bigger tap area ── */
+.stCheckbox label {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+/* ── Metrics ── */
+[data-testid="stMetricValue"] { font-size: 1.4rem !important; }
+
+/* ══ TABLET 768 – 1024 px ══ */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .block-container { max-width: 720px !important; }
+}
+
+/* ══ MOBILE ≤ 768 px ══ */
 @media (max-width: 768px) {
-    /* Shrink padding */
     .block-container {
-        padding-left: .75rem !important;
-        padding-right: .75rem !important;
+        padding-left:  max(.75rem, env(safe-area-inset-left))  !important;
+        padding-right: max(.75rem, env(safe-area-inset-right)) !important;
+        max-width: 100% !important;
     }
-    /* Hero smaller */
     .hero-title { font-size: clamp(1.4rem, 7vw, 1.8rem); }
-    /* Columns stack */
+
+    /* Stack all st.columns vertically */
     [data-testid="column"] {
         width: 100% !important;
         flex: 1 1 100% !important;
         min-width: 0 !important;
     }
-    /* Bigger buttons */
+
     .stButton > button { min-height: 52px; font-size: 1rem !important; }
-    /* Result card text */
     .result-card { padding: 1rem !important; }
-    /* Metric font */
-    [data-testid="stMetricValue"] { font-size: 1.3rem !important; }
+    [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
+
+    /* Sidebar: scrollable overlay on mobile */
+    [data-testid="stSidebar"] {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        max-height: 100dvh !important;
+    }
 }
 
+/* ══ SMALL PHONE ≤ 480 px ══ */
 @media (max-width: 480px) {
-    .hero-title { font-size: 1.5rem; }
+    .hero-title { font-size: 1.4rem; }
     .step-badge { width: 22px; height: 22px; font-size: .7rem; }
-    .stTabs [data-baseweb="tab"] { padding: 8px 8px !important; font-size: .8rem !important; }
+    .stTabs [data-baseweb="tab"] { padding: 10px 8px !important; font-size: .82rem !important; }
+    [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
+}
+
+/* ══ LANDSCAPE PHONE (height ≤ 500 px) ══ */
+@media (max-height: 500px) and (orientation: landscape) {
+    .hero-title { font-size: 1.2rem; margin-bottom: .1rem; }
+    .hero-sub   { margin-bottom: .5rem; }
+    .block-container { padding-top: .5rem !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -387,7 +439,7 @@ def login_screen():
     </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([0.5, 3, 0.5])
     with col2:
         with st.form("login_form"):
             st.markdown(f"#### {t('login_title')}")
@@ -439,14 +491,56 @@ def get_openrouter_model():
 # HELPERS IMAGE
 # ══════════════════════════════════════════════
 def prepare_image(uploaded):
-    img = Image.open(uploaded)
+    """
+    Load, normalise and resize an image from any upload source.
+    Handles: HEIC/HEIF (iPhone), wrong EXIF orientation, large files, RGBA→RGB.
+    Returns: (PIL.Image, bytes, mime_type, base64_str)
+    """
+    raw_bytes = uploaded.read() if hasattr(uploaded, "read") else uploaded.getvalue()
+
+    # HEIC / HEIF support — register opener if pillow-heif is installed
+    fname = getattr(uploaded, "name", "").lower()
+    if fname.endswith((".heic", ".heif")):
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+        except ImportError:
+            pass  # best-effort; PIL may still open it on some builds
+
+    img = Image.open(io.BytesIO(raw_bytes))
+
+    # Normalise format
+    fmt = (img.format or "JPEG").upper()
+    if fmt not in ("JPEG", "PNG", "WEBP"):
+        fmt = "JPEG"
+
+    # Convert colour modes
+    if fmt == "JPEG" and img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+    elif fmt == "PNG" and img.mode == "P":
+        img = img.convert("RGBA")
+
+    # Fix EXIF orientation (iPhone photos often arrive rotated)
+    try:
+        from PIL import ImageOps
+        img = ImageOps.exif_transpose(img)
+    except Exception:
+        pass
+
+    # Resize if too large (saves bandwidth & avoids API payload limits)
+    MAX_SIDE = 1600
+    if max(img.size) > MAX_SIDE:
+        img.thumbnail((MAX_SIDE, MAX_SIDE), Image.LANCZOS)
+
     buf = io.BytesIO()
-    fmt = img.format or "JPEG"
-    if fmt.upper() not in ["JPEG","PNG","WEBP"]: fmt = "JPEG"
-    (img.convert("RGB") if fmt=="JPEG" else img).save(buf, format=fmt)
-    raw = buf.getvalue()
+    save_kw = {"format": fmt}
+    if fmt == "JPEG":
+        save_kw["quality"]   = 85
+        save_kw["optimize"]  = True
+    img.save(buf, **save_kw)
+    result_bytes = buf.getvalue()
     mime = f"image/{fmt.lower()}"
-    return img, raw, mime, base64.b64encode(raw).decode()
+    return img, result_bytes, mime, base64.b64encode(result_bytes).decode()
 
 # ══════════════════════════════════════════════
 # HELPERS IA
@@ -596,7 +690,7 @@ with st.sidebar:
         sc = st.camera_input("", label_visibility="collapsed", key="cam_scan")
         if sc: scan_image = sc
     with scan_tab2:
-        su = st.file_uploader("", type=["jpg","jpeg","png","webp"],
+        su = st.file_uploader("", type=["jpg","jpeg","png","webp","heic","heif"],
                                label_visibility="collapsed", key="up_scan")
         if su: scan_image = su
 
@@ -663,7 +757,7 @@ Use a matching color emoji in the name. Be precise about accepted content."""
         st.rerun()
 
     st.markdown(f"""<div style='font-size:.7rem;color:#555;text-align:center;margin-top:.8rem'>
-    TriSmart v7.0 · {get_provider()} · Free</div>""", unsafe_allow_html=True)
+    TriSmart v8.0 · {get_provider()} · Free</div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # DASHBOARD
@@ -728,9 +822,10 @@ if not active_key:
     st.info(f"👈 {t('key_missing_main')}")
 
 if bins_config:
-    cols = st.columns(min(len(bins_config),4))
+    n_cols = min(len(bins_config), 4)
+    cols = st.columns(n_cols)
     for i,(bname,bdata) in enumerate(bins_config.items()):
-        with cols[i%4]:
+        with cols[i % n_cols]:
             st.markdown(f"""<div style="background:{bdata['couleur']}22;border:1px solid {bdata['couleur']};
                 border-radius:8px;padding:6px;text-align:center;font-size:.75rem;color:#ddd;margin-bottom:4px">
                 {bname}</div>""", unsafe_allow_html=True)
@@ -747,71 +842,113 @@ if bins_config:
 
 import streamlit.components.v1 as _stc
 
-# Injecter du JS pour détecter mobile et stocker dans session_state
-if "is_mobile" not in st.session_state:
-    st.session_state["is_mobile"] = False
+# ══════════════════════════════════════════════
+# CAPTURE — PC · iOS · iPadOS · Android
+# ══════════════════════════════════════════════
+#
+# Platform strategy:
+#   Desktop Chrome / Firefox  →  st.camera_input  (live webcam stream)
+#   Android Chrome            →  st.camera_input  (works natively)
+#   iOS Safari / iPadOS       →  file_uploader with accept="image/*"
+#                                triggers the native iOS camera sheet
+#                                (Camera / Photo Library / Files) — most
+#                                reliable approach on WebKit.
+#   All platforms             →  Gallery/upload tab always available.
+#
+# The iOS hint message is translated into all 7 UI languages.
+# ──────────────────────────────────────────────
 
-_stc.html("""
-<script>
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-window.parent.postMessage({type:"trismart_device", mobile: isMobile}, "*");
-</script>
-""", height=0)
+_IOS_HINT = {
+    "fr": "— Problème de caméra ? Utilisez le bouton ci-dessous —",
+    "en": "— Camera not working? Use the button below —",
+    "de": "— Kamera funktioniert nicht? Schaltfläche unten nutzen —",
+    "es": "— ¿Cámara no funciona? Use el botón de abajo —",
+    "ko": "— 카메라 문제? 아래 버튼을 사용하세요 —",
+    "zh": "— 相机有问题？请使用下方按钮 —",
+    "ja": "— カメラが使えない場合は下のボタンを使ってください —",
+}
+_IOS_BTN = {
+    "fr": "📸 Prendre une photo (iOS / Safari)",
+    "en": "📸 Take a photo (iOS / Safari)",
+    "de": "📸 Foto aufnehmen (iOS / Safari)",
+    "es": "📸 Tomar una foto (iOS / Safari)",
+    "ko": "📸 사진 찍기 (iOS / Safari)",
+    "zh": "📸 拍照 (iOS / Safari)",
+    "ja": "📸 写真を撮る (iOS / Safari)",
+}
+_REAR = {
+    "fr": "📷 Caméra arrière", "en": "📷 Rear camera",
+    "de": "📷 Rückkamera",     "es": "📷 Cámara trasera",
+    "ko": "📷 후면 카메라",      "zh": "📷 后置摄像头",    "ja": "📷 背面カメラ",
+}
+_FRONT = {
+    "fr": "🤳 Caméra frontale", "en": "🤳 Front camera",
+    "de": "🤳 Frontkamera",     "es": "🤳 Cámara frontal",
+    "ko": "🤳 전면 카메라",      "zh": "🤳 前置摄像头",    "ja": "🤳 前面カメラ",
+}
 
-# Mode capture sélectionnable
-cap_modes = [t("tab_camera"), "📁 " + t("tab_upload").replace("🖼️ ","")]
+_lc = get_lang_code()
+
 tab1, tab2 = st.tabs([t("tab_camera"), t("tab_upload")])
 captured_image = None
 source_label   = ""
 
 with tab1:
-    # Bascule caméra avant/arrière
+    # Front / rear camera toggle
     cam_col1, cam_col2 = st.columns(2)
     with cam_col1:
-        cam_back = st.button("📷 " + ("Caméra arrière" if get_lang_code()=="fr" else "Rear camera"),
-                             use_container_width=True,
-                             type="primary" if st.session_state.get("cam_facing","back")=="back" else "secondary")
-        if cam_back: st.session_state["cam_facing"] = "back"; st.rerun()
+        if st.button(_REAR.get(_lc, "📷 Rear camera"), use_container_width=True,
+                     type="primary" if st.session_state.get("cam_facing","back")=="back" else "secondary"):
+            st.session_state["cam_facing"] = "back"; st.rerun()
     with cam_col2:
-        cam_front = st.button("🤳 " + ("Caméra frontale" if get_lang_code()=="fr" else "Front camera"),
-                              use_container_width=True,
-                              type="primary" if st.session_state.get("cam_facing","back")=="front" else "secondary")
-        if cam_front: st.session_state["cam_facing"] = "front"; st.rerun()
+        if st.button(_FRONT.get(_lc, "🤳 Front camera"), use_container_width=True,
+                     type="primary" if st.session_state.get("cam_facing","back")=="front" else "secondary"):
+            st.session_state["cam_facing"] = "front"; st.rerun()
 
     facing_mode = "user" if st.session_state.get("cam_facing","back")=="front" else "environment"
 
-    # st.camera_input (fonctionne bien desktop + Android Chrome)
+    # Primary: st.camera_input — best on desktop and Android Chrome
     cam = st.camera_input("", label_visibility="collapsed", key=f"cam_{facing_mode}")
     if cam:
         captured_image = cam
-        source_label = t("tab_camera")
+        source_label   = t("tab_camera")
 
-    # Séparateur + alternative native pour iOS / navigateurs récalcitrants
-    st.markdown("""<div style='text-align:center;color:#555;font-size:.8rem;
-        margin:.5rem 0'>— iOS / problème de caméra ? Utilisez ceci —</div>""",
-        unsafe_allow_html=True)
+    # iOS / iPadOS / WebKit fallback
+    # A file_uploader with type=image/* shows the native iOS action sheet
+    # (Camera / Photo Library / Files) — far more reliable than camera_input on Safari.
+    st.markdown(
+        f"<div style='text-align:center;color:#555;font-size:.8rem;margin:.6rem 0'>"
+        f"{_IOS_HINT.get(_lc, _IOS_HINT['en'])}</div>",
+        unsafe_allow_html=True,
+    )
     ios_file = st.file_uploader(
-        "📸 Prendre une photo (iOS / fallback)",
-        type=["jpg","jpeg","png","webp","heic"],
+        _IOS_BTN.get(_lc, _IOS_BTN["en"]),
+        type=["jpg", "jpeg", "png", "webp", "heic", "heif"],
         label_visibility="visible",
         key="ios_cam",
-        help="Ouvre directement l'appareil photo sur iOS Safari"
+        help="📱 iOS Safari / iPadOS — opens native camera / photo picker",
     )
     if ios_file:
         captured_image = ios_file
-        source_label = "photo"
+        source_label   = "photo"
 
 with tab2:
-    upl = st.file_uploader("", type=["jpg","jpeg","png","webp","heic"],
-                            label_visibility="collapsed", key="up_dechet")
-    if upl: captured_image = upl; source_label = upl.name
+    upl = st.file_uploader(
+        "", type=["jpg","jpeg","png","webp","heic","heif"],
+        label_visibility="collapsed", key="up_dechet",
+    )
+    if upl:
+        captured_image = upl
+        source_label   = upl.name
 
 # ══════════════════════════════════════════════
 # ANALYSE
 # ══════════════════════════════════════════════
 if captured_image and active_key and bins_config:
     img, img_bytes, mime_type, b64_img = prepare_image(captured_image)
-    ci,co = st.columns([1,1])
+
+    # Preview + analyse — two columns (CSS stacks them on mobile automatically)
+    ci, co = st.columns([1, 1])
     with ci:
         st.image(img, caption=f"📷 {source_label}", use_container_width=True)
     with co:
@@ -857,15 +994,19 @@ Reply ONLY with valid JSON, no backticks:
 
                 st.markdown(f"""
                 <div style="background:linear-gradient(135deg,#0d1f0d,#0d1520);
-                    border:2px solid {bin_color};border-radius:20px;padding:1.5rem 2rem;margin:1rem 0">
-                    <div style="font-size:3rem;text-align:center">{result.get('emoji','♻️')}</div>
-                    <div style="text-align:center;font-size:1.5rem;font-weight:700;color:white;margin:.5rem 0">
+                    border:2px solid {bin_color};border-radius:20px;
+                    padding:clamp(.8rem,4vw,1.5rem) clamp(.8rem,4vw,2rem);
+                    margin:1rem 0;word-break:break-word">
+                    <div style="font-size:clamp(2rem,8vw,3rem);text-align:center">{result.get('emoji','♻️')}</div>
+                    <div style="text-align:center;font-size:clamp(1.1rem,4vw,1.5rem);font-weight:700;color:white;margin:.5rem 0">
                         {result.get('objet_detecte','?')}</div>
-                    <div style="text-align:center;color:#aaa;font-size:.9rem">
+                    <div style="text-align:center;color:#aaa;font-size:clamp(.8rem,3vw,.9rem)">
                         {t('material')} : <strong style="color:#ddd">{result.get('materiau','?')}</strong></div>
                     <div style="margin:1rem 0;text-align:center">
                         <span style="background:{bin_color}22;border:2px solid {bin_color};color:white;
-                            padding:.5rem 1.5rem;border-radius:999px;font-size:1.2rem;font-weight:700">
+                            padding:.5rem clamp(.8rem,3vw,1.5rem);border-radius:999px;
+                            font-size:clamp(1rem,4vw,1.2rem);font-weight:700;
+                            display:inline-block;max-width:100%;white-space:normal;word-break:break-word">
                             ➜ {bin_name}</span></div>
                     <div style="margin:.5rem 0">
                         <div style="display:flex;justify-content:space-between;color:#aaa;font-size:.8rem;margin-bottom:4px">
@@ -873,7 +1014,7 @@ Reply ONLY with valid JSON, no backticks:
                         <div style="background:#333;border-radius:4px;height:8px">
                             <div style="background:linear-gradient(90deg,{bin_color},#00a8ff);
                                 width:{conf}%;height:8px;border-radius:4px"></div></div></div>
-                    <div style="color:#ccc;font-size:.95rem;margin-top:1rem;line-height:1.5">
+                    <div style="color:#ccc;font-size:clamp(.85rem,3vw,.95rem);margin-top:1rem;line-height:1.6">
                         💡 {result.get('raison','')}</div>
                 </div>""", unsafe_allow_html=True)
 
@@ -946,5 +1087,5 @@ with st.expander(f"{t('guide_title')} — {country}"):
 
 st.markdown("""
 <div style='text-align:center;color:#444;font-size:.8rem;margin-top:2rem'>
-TriSmart v7.6 · Gemini + OpenRouter · Streamlit · Free
+TriSmart v8.0 · Gemini + OpenRouter · Streamlit · Free
 </div>""", unsafe_allow_html=True)
